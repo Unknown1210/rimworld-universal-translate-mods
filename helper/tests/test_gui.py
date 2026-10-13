@@ -98,6 +98,49 @@ class Window(unittest.TestCase):
         self.assertIn("Mod NÃO atualizado", app.update_msg.get())
         self.assertNotIn("falhou", app.update_msg.get())
 
+    def test_log_tab_shows_what_was_translated_and_follows_the_language(self):
+        from rwtranslate import activity
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        self.assertEqual(app.nb.tab(app.log_tab, "text"), "Log")
+        self.assertEqual(len(app.nb.tabs()), 3, "Home, Translate mods, Log")
+        activity.clear()
+        app.log_entries = []
+        app.render_log()
+        activity.emit("game", "log_game_batch", {"n": 1, "src": "en", "tgt": "pt-BR", "mod": "x.rescue", "chars": 17, "ms": 12,
+                                                 "first": "Search and rescue  ->  Buscar e resgatar"}, pairs=[("Search and rescue", "Buscar e resgatar")])
+        activity.emit("model", "log_model_failed", {"src": "en", "tgt": "xx"}, level="error")
+        def row_values():
+            return [(i, app.log_tree.item(i, "values")) for i in app.log_tree.get_children()]
+        self.assertTrue(pump(self.root, lambda: any("x.rescue" in v[2] for _i, v in row_values()) and any("ERRO" in v[1] for _i, v in row_values())),
+                        "entries from any thread show up")
+        game_iid, game = next((i, v) for i, v in row_values() if "x.rescue" in v[2])
+        self.assertIn("Search and rescue -> Buscar e resgatar", game[2], "a translated button is shown: original and translation")
+        self.assertEqual(game[1], "Jogo")
+        # click a line: the details list every text with its translation
+        app.log_tree.selection_set(game_iid)
+        self.root.update()
+        detail = app.log_detail.get("1.0", "end")
+        self.assertIn("Search and rescue", detail)
+        self.assertIn("-> Buscar e resgatar", detail)
+        # filter: only warnings and errors (the game line is gone, the error stays)
+        app.log_filter_box.current(app.LOG_FILTERS.index("problems"))
+        app.render_log()
+        self.assertTrue(row_values() and all(("ERRO" in v[1] or "aviso" in v[1]) for _i, v in row_values()))
+        app.log_filter_box.current(app.LOG_FILTERS.index("all"))
+        app.render_log()
+        # the window language changes the text of every entry and the tab
+        app.set_lang("en")
+        game = next(v for _i, v in row_values() if "x.rescue" in v[2])
+        self.assertIn("The game asked for a translation", game[2])
+        self.assertEqual(game[1], "Game")
+        self.assertEqual(app.log_tree.heading("msg")["text"], "What happened")
+        self.assertEqual(app.log_filter_box.get(), "Everything")
+        # copy and clear
+        app.copy_log()
+        self.assertIn("Search and rescue", self.root.clipboard_get())
+        app.clear_log()
+        self.assertEqual(len(app.log_tree.get_children()), 0)
+
     def test_up_to_date_message_and_button(self):
         app = self.build(fake_fetcher(release_json("v0.0")))
         self.assertTrue(pump(self.root, lambda: "já está na versão mais nova" in app.update_msg.get()), app.update_msg.get())

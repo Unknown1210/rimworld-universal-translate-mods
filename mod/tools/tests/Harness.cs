@@ -99,6 +99,7 @@ public static class Harness
         Scenario9_PlaceholderTranslationFiles(home);
         Scenario10_Designators(home);
         Scenario11_TranslationsWrittenWhileGameRuns(home);
+        Scenario12_ModListTools(home);
 
         // ---- Crash report + log content
         string crash = CrashReporter.WriteReport("test", new InvalidOperationException("outer", new ArgumentException("inner cause")));
@@ -500,33 +501,101 @@ public static class Harness
 
     static void Scenario11_TranslationsWrittenWhileGameRuns(string home)
     {
-        Console.WriteLine("== scenario 11: the translator program writes translations while the game is open");
+        Console.WriteLine("== scenario 11: the translator program writes translations while the game is open (applied live, mod by mod)");
         AutoTranslateMod.Settings = new AtSettings();
         var mod = new ModContentPack { RootDir = Path.Combine(home, "lv", "m"), Name = "Live Mod", PackageIdPlayerFacing = "h.live" };
+        var other = new ModContentPack { RootDir = Path.Combine(home, "lv", "o"), Name = "Other Mod", PackageIdPlayerFacing = "h.other" };
         var table = new ThingDef { defName = "Table", label = "electric table", description = "An advanced work table." };
-        mod.defs.Add(table);
-        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        var chair = new ThingDef { defName = "Chair", label = "wooden chair", description = "A plain chair." };
+        mod.defs.Add(table); other.defs.Add(chair);
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod, other };
         LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
         LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };
         Run("pt");
-        Check(table.label == "electric table (pt)", "first run: translated by the (fake) helper: " + table.label);
-        // the program rewrites the cache file of this mod (as its bulk run does: new file, new write time)
+        Check(table.label == "electric table (pt)" && chair.label == "wooden chair (pt)", "first run: translated by the (fake) helper: " + table.label);
+        int applied = Pipeline.Applied;
+        string flag = Path.Combine(Paths.DataDir, "bulk-running.flag");
         string f = Path.Combine(Path.Combine(Paths.CacheDir, Pipeline.Target), "h.live.json");
+        int oldPoll = Pipeline.CachePollMs, oldIdle = Pipeline.IdlePollMs;
+        Pipeline.CachePollMs = 40; Pipeline.IdlePollMs = 40;
+        Action<double> pump = secs => { var w = System.Diagnostics.Stopwatch.StartNew(); while (w.Elapsed.TotalSeconds < secs) { Thread.Sleep(20); Pipeline.Tick(); } };
+        // 1) the program writes the cache file of ONE mod, but is NOT translating (no flag): the game does not even look at the files
         File.WriteAllText(f, "{\"format\":1,\"entries\":{\"electric table\":\"mesa elétrica\",\"An advanced work table.\":\"Uma mesa avançada.\"}}", new System.Text.UTF8Encoding(false));
         File.SetLastWriteTimeUtc(f, DateTime.UtcNow.AddMinutes(5));
-        int oldPoll = Pipeline.TargetPollMs;
-        Pipeline.TargetPollMs = 40;
+        pump(0.4);
+        Check(table.label == "electric table (pt)", "idle (no flag): the cache folder is not checked, nothing changes: '" + table.label + "'");
+        // 2) the program starts translating (flag): the game now looks, and applies live, mod by mod
+        File.WriteAllText(flag, "x");
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (table.label != "mesa elétrica" && sw.Elapsed.TotalSeconds < 8) { Thread.Sleep(30); Pipeline.Tick(); }
-        WaitWorker(System.Diagnostics.Stopwatch.StartNew());
-        Pipeline.TargetPollMs = oldPoll;
-        Check(table.label == "mesa elétrica" && table.description == "Uma mesa avançada.", "translations written outside the game show up without a restart: '" + table.label + "'");
-        // a file written by the game itself is NOT taken for an outside change (no reload loop)
-        var before = Pipeline.Describe();
-        Pipeline.TargetPollMs = 40;
-        for (int i = 0; i < 20; i++) { Thread.Sleep(30); Pipeline.Tick(); }
-        Pipeline.TargetPollMs = oldPoll;
-        Check(table.label == "mesa elétrica", "nothing changes while nobody touches the files");
+        while (table.label != "mesa elétrica" && sw.Elapsed.TotalSeconds < 8) { Thread.Sleep(20); Pipeline.Tick(); }
+        Check(table.label == "mesa elétrica" && table.description == "Uma mesa avançada.", "while the program translates, new translations show up live, no restart, no reload: '" + table.label + "'");
+        Check(chair.label == "wooden chair (pt)", "other mods are not touched");
+        Check(Pipeline.Applied - applied == 2, "only the 2 changed texts were applied (" + (Pipeline.Applied - applied) + ")");
+        // 3) the last mod is written and the flag goes away at once: one FINAL look still catches it, then the game goes quiet
+        pump(0.2);
+        File.WriteAllText(f, "{\"format\":1,\"entries\":{\"electric table\":\"mesa elétrica final\"}}", new System.Text.UTF8Encoding(false));
+        File.SetLastWriteTimeUtc(f, DateTime.UtcNow.AddMinutes(8));
+        File.Delete(flag);
+        sw.Restart();
+        while (table.label != "mesa elétrica final" && sw.Elapsed.TotalSeconds < 8) { Thread.Sleep(20); Pipeline.Tick(); }
+        Check(table.label == "mesa elétrica final", "after the flag is gone one final check applies the last files: '" + table.label + "'");
+        File.WriteAllText(f, "{\"format\":1,\"entries\":{\"electric table\":\"nunca aplicada\"}}", new System.Text.UTF8Encoding(false));
+        File.SetLastWriteTimeUtc(f, DateTime.UtcNow.AddMinutes(9));
+        pump(0.5);
+        Check(table.label == "mesa elétrica final", "and then it stops checking until the program translates again");
+        // 4) a flag nobody refreshes (the program crashed) is ignored
+        File.WriteAllText(flag, "x");
+        File.SetLastWriteTimeUtc(flag, DateTime.UtcNow.AddMinutes(-5));
+        pump(0.5);
+        Check(table.label == "mesa elétrica final", "a stale flag (crashed program) is not a reason to keep checking");
+        File.Delete(flag);
+        // 5) translations switched off: the new text waits and comes back with the switch
+        Pipeline.SetSuspended(true);
+        Check(table.label == "electric table", "OFF restores the original");
+        File.WriteAllText(flag, "x");
+        pump(0.3);
+        Check(table.label == "electric table", "while OFF the original stays on screen");
+        Pipeline.SetSuspended(false);
+        Check(table.label == "nunca aplicada", "ON again: the newest translation (it arrived while OFF): '" + table.label + "'");
+        File.Delete(flag);
+        Pipeline.CachePollMs = oldPoll; Pipeline.IdlePollMs = oldIdle;
+    }
+
+    static void Scenario12_ModListTools(string home)
+    {
+        Console.WriteLine("== scenario 12: diagnostic of one mod, one translation source for many mods, defs the game generated itself");
+        AutoTranslateMod.Settings = new AtSettings();
+        var a = new ModContentPack { RootDir = Path.Combine(home, "mt", "a"), Name = "Mod A", PackageIdPlayerFacing = "t.moda" };
+        var b = new ModContentPack { RootDir = Path.Combine(home, "mt", "b"), Name = "Mod B", PackageIdPlayerFacing = "t.modb" };
+        var gatherer = new ThingDef { defName = "Gatherer", label = "gatherer", description = "Uses local resources when building roads." };
+        var made = new RecipeDef { defName = "MakeThing", label = "Fazer ISR2G", description = "Fazer um ISR2G", generated = true };   // a recipe the game made, in its own language
+        var plain = new ThingDef { defName = "Plain", label = "plain bench",
+            description = "Esta bancada serve para fabricar componentes e também ajuda muito os colonos que trabalham aqui, porque não é necessário muito espaço para usar." };   // a long text already in Portuguese inside an English mod
+        a.defs.AddRange(new Def[] { gatherer, made }); b.defs.Add(plain);
+        for (int k = 1; k <= 4; k++)       // a realistic English mod: several English texts around the one long Portuguese description
+            b.defs.Add(new ThingDef { defName = "Bench" + k, label = "work bench " + k, description = "A sturdy workbench that is used to make things for the colony, and it can be built with the materials that you have." });
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { a, b };
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };
+        Run("pt");
+        Check(gatherer.label == "gatherer (pt)", "normal def translated");
+        Check(plain.label == "plain bench (pt)" && plain.description.StartsWith("Esta bancada serve") && !plain.description.EndsWith("(pt)"),
+              "a long text already in Portuguese is NOT translated again, the short English label of the same mod is: '" + plain.description + "'");
+        Check(made.label == "Fazer ISR2G" && made.description == "Fazer um ISR2G", "a def the game generated in the target language is left alone (it used to become 'Fazenda ISR2G'): '" + made.label + "'");
+        ModState ma = Mod("t.moda");
+        string diag = Pipeline.DiagnoseMod(ma);
+        Check(diag.Contains("t.moda") && diag.Contains("translated and applied: 2") && diag.Contains("waiting: 0") && diag.Contains("Translation file:"), "diagnostic report of a healthy mod:\n" + diag);
+        // a text waiting although the translation file has it (the case to look for)
+        var it = Pipeline.Mods.Find(m => m.Id == "t.modb");
+        Check(Pipeline.DiagnoseMod(it).Contains("waiting: 0"), "second mod healthy too");
+        // one translation source for all shown mods: mods the player turned off or that were disabled are left alone
+        Pipeline.SetMode(Mod("t.modb"), ModMode.Off);
+        int n = Pipeline.SetModeForAll(Pipeline.Mods.FindAll(m => !m.IsSelf), ModMode.Mine);
+        Check(n == 1 && Mod("t.moda").Mode == ModMode.Mine && Mod("t.modb").Mode == ModMode.Off, "apply-to-all changes the active mods only (" + n + " changed)");
+        Check(AutoTranslateMod.Settings.modModes["t.moda"] == ModMode.Mine && !AutoTranslateMod.Settings.modModes.ContainsKey("t.nothing"), "and it is saved with the settings");
+        n = Pipeline.SetModeForAll(Pipeline.Mods.FindAll(m => !m.IsSelf), ModMode.Auto);
+        Check(n == 1 && Mod("t.moda").Mode == ModMode.Auto && !AutoTranslateMod.Settings.modModes.ContainsKey("t.moda"), "back to automatic: nothing stored for it");
+        Check(Pipeline.SettingsChangedSinceStart(), "the change applies when the settings window closes");
     }
 
     static void Scenario4_CrashMarker(string home)
@@ -536,11 +605,23 @@ public static class Harness
         var w = Build(home, "s4", false);
         StateStore.Clear("d.bad");
         File.WriteAllText(Path.Combine(Paths.DataDir, "state/applying.txt"), "a.good");
+        StateStore.ClearSuspects();
         Run("pt");
-        Check(Mod("a.good").AutoDisabled && Mod("a.good").DisableReason.Contains("ended while"), "mod blamed for crash during apply: " + Mod("a.good").DisableReason);
-        Check(w.Sword.label == "iron sword", "blamed mod not touched");
+        Check(Mod("a.good").AutoDisabled && Mod("a.good").DisableReason.Contains("ended while"), "mod suspected after a crash during apply: " + Mod("a.good").DisableReason);
+        Check(w.Sword.label == "iron sword", "suspected mod not touched");
+        Check(StateStore.GetDisabledReason("a.good") == null, "the FIRST time it is off for this session only: nothing is saved (a closed or killed game must not cost the translation for good)");
         Check(!File.Exists(Path.Combine(Paths.DataDir, "state/applying.txt")), "marker cleaned up");
+        File.WriteAllText(Path.Combine(Paths.DataDir, "state/applying.txt"), "a.good");           // and again, with no clean quit in between
+        Run("pt");
+        Check(StateStore.GetDisabledReason("a.good") != null, "the SECOND time in a row it is saved: " + StateStore.GetDisabledReason("a.good"));
         Pipeline.Reenable(Mod("a.good"));
         Check(StateStore.GetDisabledReason("a.good") == null, "re-enable clears the flag");
+        File.WriteAllText(Path.Combine(Paths.DataDir, "state/applying.txt"), "a.good");           // a clean quit in between resets the count
+        Run("pt");
+        StateStore.ClearSuspects();                                                                 // (what OnQuit does)
+        File.WriteAllText(Path.Combine(Paths.DataDir, "state/applying.txt"), "a.good");
+        Run("pt");
+        Check(StateStore.GetDisabledReason("a.good") == null, "after a clean quit the count starts again: still not saved");
+        Pipeline.Reenable(Mod("a.good"));
     }
 }

@@ -14,7 +14,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from . import __version__, bulk, config, diagnostics, i18n, languages, logsetup, models, server, updater
+from . import __version__, activity, bulk, config, diagnostics, i18n, languages, logsetup, models, server, updater
 from .paths import logs_dir
 
 log = logsetup.get("gui")
@@ -107,15 +107,23 @@ class App:
         self.nb.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
         self.home = ttk.Frame(self.nb, padding=10)
         self.bulk_tab = ttk.Frame(self.nb, padding=10)
+        self.log_tab = ttk.Frame(self.nb, padding=10)
         self.nb.add(self.home, text="")
         self.nb.add(self.bulk_tab, text="")
+        self.nb.add(self.log_tab, text="")
         self.build_home()
         self.build_bulk()
+        self.build_log()
 
         root.bind("<Configure>", self.on_resize)
         self.apply_language()
         self.refresh_status()
         self._pump_id = self.root.after(100, self.pump)
+        self._log_cb = lambda e: self.post(lambda: self.on_log_entry(e))        # entries come from other threads: hand them to this one
+        activity.install_log_handler()
+        activity.subscribe(self._log_cb)
+        self.log_entries = list(activity.snapshot())
+        self.render_log()
         self.start_check()
         self.refresh_plan()
 
@@ -153,6 +161,10 @@ class App:
         self.lbl_keep.grid(row=0, column=0, sticky="ew")
         self.lbl_keep2 = ttk.Label(keep_box, foreground="#555555", anchor="center", justify="center")      # when it can be closed
         self.lbl_keep2.grid(row=1, column=0, sticky="ew", pady=(2, 0))
+        self.lbl_keep3 = ttk.Label(keep_box, foreground="#8a5a00", anchor="center", justify="center")      # texts only the running game can ask for
+        self.lbl_keep3.grid(row=2, column=0, sticky="ew", pady=(4, 0))
+        self.lbl_keep4 = ttk.Label(keep_box, foreground="#555555", anchor="center", justify="center")      # restart if the game does not show new translations
+        self.lbl_keep4.grid(row=3, column=0, sticky="ew", pady=(4, 0))
         self.status = self.field(content, 1)
         self.status2 = self.field(content, 2, pady=(0, 8))
 
@@ -228,6 +240,163 @@ class App:
         self.row_mods = {}
         self.bulk_hint = self.field(b, 8, pady=(4, 0), color="#666666")
 
+    LOG_FILTERS = ("all", "game", "bulk", "model", "update", "system", "problems")
+
+    def build_log(self):
+        ttk, lg = self.ttk, self.log_tab
+        lg.columnconfigure(0, weight=1)
+        lg.rowconfigure(2, weight=3)
+        lg.rowconfigure(3, weight=2)
+        self.log_msg = self.field(lg, 4, pady=(4, 0), color="#2a7a2a")
+        self.log_entries = []
+        self.log_rows = {}
+        self.log_hint = self.field(lg, 0, pady=(0, 6), color="#666666")
+        bar = ttk.Frame(lg)
+        bar.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        bar.columnconfigure(3, weight=1)
+        self.lbl_log_filter = ttk.Label(bar)
+        self.lbl_log_filter.grid(row=0, column=0, padx=(0, 6))
+        self.log_filter_box = ttk.Combobox(bar, state="readonly", width=24)
+        self.log_filter_box.grid(row=0, column=1, padx=(0, 12))
+        self.log_filter_box.bind("<<ComboboxSelected>>", lambda _e: self.render_log())
+        self.btn_log_copy = ttk.Button(bar, command=self.copy_log)
+        self.btn_log_copy.grid(row=0, column=2, padx=3)
+        self.btn_log_clear = ttk.Button(bar, command=self.clear_log)
+        self.btn_log_clear.grid(row=0, column=3, padx=3, sticky="w")
+        self.btn_log_folder = ttk.Button(bar, command=lambda: open_folder(logs_dir()))
+        self.btn_log_folder.grid(row=0, column=4, padx=3, sticky="e")
+        tf = ttk.Frame(lg)
+        tf.grid(row=2, column=0, sticky="nsew")
+        tf.columnconfigure(0, weight=1)
+        tf.rowconfigure(0, weight=1)
+        self.log_tree = ttk.Treeview(tf, columns=("time", "kind", "msg"), show="headings", height=10)
+        for c, w, a, st in (("time", 70, "center", False), ("kind", 90, "center", False), ("msg", 600, "w", True)):
+            self.log_tree.column(c, width=w, anchor=a, stretch=st)
+        self.log_tree.tag_configure("warning", foreground="#a15c00")
+        self.log_tree.tag_configure("error", foreground="#b00020")
+        self.log_tree.grid(row=0, column=0, sticky="nsew")
+        sb = ttk.Scrollbar(tf, orient="vertical", command=self.log_tree.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.log_tree.configure(yscrollcommand=sb.set)
+        self.log_tree.bind("<<TreeviewSelect>>", self.on_log_select)
+        df = ttk.Frame(lg)
+        df.grid(row=3, column=0, sticky="nsew", pady=(6, 0))
+        df.columnconfigure(0, weight=1)
+        df.rowconfigure(0, weight=1)
+        self.log_detail = self.tk.Text(df, height=8, wrap="word")
+        self.log_detail.grid(row=0, column=0, sticky="nsew")
+        dsb = ttk.Scrollbar(df, orient="vertical", command=self.log_detail.yview)
+        dsb.grid(row=0, column=1, sticky="ns")
+        self.log_detail.configure(yscrollcommand=dsb.set, state="disabled")
+
+    def entry_text(self, e):
+        """The message of a log entry in the current window language (raw technical entries are shown as they are)."""
+        if e.key is None:
+            return str(e.args.get("text", ""))
+        try:
+            return self.t(e.key, **e.args)
+        except (KeyError, IndexError):
+            return e.key
+
+    def log_filter_key(self):
+        i = self.log_filter_box.current()
+        return self.LOG_FILTERS[i] if 0 <= i < len(self.LOG_FILTERS) else "all"
+
+    def log_passes(self, e):
+        f = self.log_filter_key()
+        if f == "all":
+            return True
+        if f == "problems":
+            return e.level in ("warning", "error")
+        return e.kind == f
+
+    def log_row_values(self, e):
+        kind = self.t("log_kind_" + e.kind)
+        if e.level in ("warning", "error"):
+            kind += " (" + self.t("log_lvl_" + e.level) + ")"
+        return (time.strftime("%H:%M:%S", time.localtime(e.when)), kind, " ".join(self.entry_text(e).split()))
+
+    def add_log_row(self, e):
+        iid = self.log_tree.insert("", "end", values=self.log_row_values(e), tags=(e.level,))
+        self.log_rows[iid] = e
+        return iid
+
+    def render_log(self):
+        """Draw the entries again (filter or window language changed); the selected entry stays selected."""
+        sel = self.log_rows.get((self.log_tree.selection() or [None])[0])
+        self.log_tree.delete(*self.log_tree.get_children())
+        self.log_rows = {}
+        keep = None
+        for e in self.log_entries[-activity.MAX_ENTRIES:]:
+            if self.log_passes(e):
+                iid = self.add_log_row(e)
+                if e is sel:
+                    keep = iid
+        if keep:
+            self.log_tree.selection_set(keep)
+        self.log_tree.yview_moveto(1.0)
+        self.on_log_select()
+
+    def on_log_entry(self, e):
+        """An entry arrived from any thread: keep it, and show it if the filter allows (follow the end only if already at the end)."""
+        self.log_entries.append(e)
+        if len(self.log_entries) > activity.MAX_ENTRIES:
+            del self.log_entries[: len(self.log_entries) - activity.MAX_ENTRIES]
+        if self.log_passes(e):
+            at_end = self.log_tree.yview()[1] >= 0.98
+            iid = self.add_log_row(e)
+            kids = self.log_tree.get_children()
+            if len(kids) > activity.MAX_ENTRIES:
+                self.log_rows.pop(kids[0], None)
+                self.log_tree.delete(kids[0])
+            if at_end:
+                self.log_tree.see(iid)
+
+    def on_log_select(self, _event=None):
+        sel = self.log_tree.selection()
+        e = self.log_rows.get(sel[0]) if sel else None
+        self.log_detail.configure(state="normal")
+        self.log_detail.delete("1.0", "end")
+        if e is not None:
+            body = e.detail_text()
+            self.log_detail.insert("end", self.entry_text(e) + ("\n\n" + body if body else ""))
+        elif not self.log_entries:
+            self.log_detail.insert("end", self.t("log_empty"))
+        self.log_detail.configure(state="disabled")
+
+    def apply_log_language(self):
+        t = self.t
+        self.log_hint.set_key("log_hint")
+        self.lbl_log_filter.configure(text=t("log_filter"))
+        i = max(0, self.log_filter_box.current())
+        self.log_filter_box.configure(values=[t("log_filter_" + k) if k in ("all", "problems") else t("log_kind_" + k) for k in self.LOG_FILTERS])
+        self.log_filter_box.current(i)
+        self.btn_log_copy.configure(text=t("log_copy"))
+        self.btn_log_clear.configure(text=t("log_clear"))
+        self.btn_log_folder.configure(text=t("logs_btn"))
+        for col, key in (("time", "log_col_time"), ("kind", "log_col_kind"), ("msg", "log_col_msg")):
+            self.log_tree.heading(col, text=t(key), anchor="center")
+        self.render_log()
+
+    def copy_log(self):
+        lines = []
+        for e in self.log_entries:
+            if not self.log_passes(e):
+                continue
+            tm, kind, msg = self.log_row_values(e)
+            lines.append(f"{tm} [{kind}] {msg}")
+            body = e.detail_text()
+            if body:
+                lines += ["    " + ln for ln in body.split("\n")]
+        self.root.clipboard_clear()
+        self.root.clipboard_append("\n".join(lines))
+        self.log_msg.set_key("log_copied", n=len(lines))
+
+    def clear_log(self):
+        activity.clear()
+        self.log_entries = []
+        self.render_log()
+
     def on_resize(self, event):
         if event.widget is not self.root:
             return
@@ -236,6 +405,8 @@ class App:
             f.label.configure(wraplength=wrap)
         self.lbl_keep.configure(wraplength=wrap)
         self.lbl_keep2.configure(wraplength=wrap)
+        self.lbl_keep3.configure(wraplength=wrap)
+        self.lbl_keep4.configure(wraplength=wrap)
         for path_lbl, _tag in self.dir_labels:
             path_lbl.configure(wraplength=max(150, wrap - 140))
 
@@ -250,8 +421,11 @@ class App:
         self.root.title(t("title"))
         self.nb.tab(self.home, text=t("tab_home"))
         self.nb.tab(self.bulk_tab, text=t("tab_bulk"))
+        self.nb.tab(self.log_tab, text=t("tab_log"))
         self.lbl_keep.configure(text=t("keep_open"))
         self.lbl_keep2.configure(text=t("keep_open2"))
+        self.lbl_keep3.configure(text=t("keep_open3"))
+        self.lbl_keep4.configure(text=t("keep_open4"))
         self.lbl_ui.configure(text=t("ui_lang"))
         self.lbl_target.configure(text=t("target_lang"))
         self.btn_model.configure(text=t("download_model"))
@@ -275,6 +449,7 @@ class App:
             f.render()
         self.set_lang_choices(list(self.lang_codes.values()) or SUPPORTED_TARGETS)
         self.render_rows()
+        self.apply_log_language()
         self.refresh_details_windows()
 
     def on_ui_lang(self, _event=None):
@@ -891,6 +1066,7 @@ class App:
     def quit(self, restart_exe=None):
         if self.cancel is not None:
             self.cancel.set()
+        activity.unsubscribe(getattr(self, "_log_cb", None))
         try:
             self.root.after_cancel(self._pump_id)
         except Exception:
@@ -910,6 +1086,7 @@ def main():
     import tkinter as tk
     root = tk.Tk()
     config.migrate_portuguese()
+    activity.emit("system", "log_started", {"version": __version__})
     httpd = server.serve(server.DEFAULT_PORT)
     threading.Thread(target=httpd.serve_forever, daemon=True, name="http-server").start()
     App(root, httpd)

@@ -183,9 +183,9 @@ namespace AutoTranslate
         }
 
         /// <summary>Translate a batch. Returns translations in the same order; throws HelperException (with request id) on failure.</summary>
-        public static List<string> Translate(string source, string target, IList<string> texts, out string requestId)
+        public static List<string> Translate(string source, string target, IList<string> texts, out string requestId, string mod = null)
         {
-            string body = "{\"source\":" + Json.Quote(source) + ",\"target\":" + Json.Quote(target) + ",\"texts\":" + Json.StringArray(texts) + "}";
+            string body = "{\"source\":" + Json.Quote(source) + ",\"target\":" + Json.Quote(target) + (mod != null ? ",\"mod\":" + Json.Quote(mod) : "") + ",\"texts\":" + Json.StringArray(texts) + "}";   // "mod": only for the helper's log tab
             string raw = Request("POST", "/translate", body, 180000, out requestId);
             var root = Json.Parse(raw) as Dictionary<string, object>;
             object v;

@@ -89,6 +89,36 @@ class Bulk(unittest.TestCase):
     def setUp(self):
         CALLS.clear()
 
+    def test_flag_file_tells_the_game_when_the_program_is_translating(self):
+        """The game only looks at the translation files while this flag is fresh (so it does not keep checking all the time)."""
+        from rwtranslate.paths import data_dir
+        flag = data_dir() / bulk.FLAG_NAME
+        self.assertFalse(flag.exists())
+        seen = []
+        bulk.run("pt", self.dirs, force=True, progress=lambda e: seen.append(flag.exists()) if e.get("event") == "mod_start" else None)
+        self.assertTrue(seen and all(seen), "the flag exists while mods are being translated")
+        self.assertFalse(flag.exists(), "and is removed when the run ends")
+        with self.assertRaises(RuntimeError):
+            def boom(e):
+                if e.get("event") == "mod_start":
+                    raise RuntimeError("stop")
+            bulk.run("pt", self.dirs, force=True, progress=boom)
+        self.assertFalse(flag.exists(), "even when the run dies")
+
+    def test_a_long_text_already_in_the_target_language_is_not_translated_again(self):
+        """A mod description that was already translated (it shows in Portuguese) must not be translated as if it were English."""
+        r = Path(tempfile.mkdtemp())
+        pt_long = "Esta bancada serve para fabricar componentes e também ajuda muito os colonos que trabalham aqui, porque não é necessário muito espaço para usar."
+        en_long = "A sturdy workbench that is used to make things for the colony, and it can be built with the materials that you have."
+        defs = thing("Bench1", "work bench one", en_long) + thing("Bench2", "work bench two", en_long + " Number two.") + thing("Bench3", "work bench three", en_long + " Number three.")
+        make_mod(r, "M", "m.mixed", "Mixed Mod", pt_long, defs)
+        res = {x.package_id: x for x in bulk.run("pt", [r], force=True)}["m.mixed"]
+        cache = bulk.read_cache("pt", "m.mixed")
+        self.assertNotIn(bulk.normalize(pt_long), cache, "the Portuguese text is not in the cache as a source")
+        self.assertIn(bulk.normalize(en_long), cache, "the English texts of the same mod are translated")
+        self.assertGreaterEqual(res.already_target, 1)
+        self.assertTrue(any(s["reason"] == "already_target" and s["text"] == bulk.normalize(pt_long) for s in res.skipped))
+
     def test_skipped_list_shows_the_existing_translation(self):
         res = {r.package_id: r for r in bulk.run("pt", self.dirs, force=True)}
         covered = [x for x in res["d.partial"].skipped if x["reason"] == "covered"]

@@ -12,7 +12,7 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from . import __version__, languages, logsetup, models
+from . import __version__, activity, languages, logsetup, models
 from .engine import EngineError, get_engine
 from .paths import port_file, token_file
 from .protect import clean_output, translate_protected
@@ -140,13 +140,21 @@ def make_handler(token):
                 if not _code_ok(source) or not _code_ok(target) or not isinstance(texts, list) or len(texts) > MAX_TEXTS \
                         or not all(isinstance(t, str) for t in texts):
                     raise HttpError(400, "need source/target language codes and texts:list[str] (<=500)")
+                t0 = time.perf_counter()
                 out = translate_texts(source, target, texts)
+                mod = data.get("mod") if isinstance(data.get("mod"), str) else ""
+                activity.emit("game", "log_game_batch",
+                              {"n": len(texts), "src": source, "tgt": target, "mod": mod[:120] or "?", "chars": sum(map(len, texts)),
+                               "ms": int((time.perf_counter() - t0) * 1000),
+                               "first": f"{texts[0]}  ->  {out[0]}" if len(texts) <= 3 and texts else ""},
+                              pairs=list(zip(texts, out)))
                 return 200, {"translations": out}, f"{len(texts)} texts, {sum(map(len, texts))} chars {source}->{target}"
             if method == "POST" and path == "/install":
                 data = self._read_json()
                 source, target = data.get("source", "en"), data.get("target")
                 if not _code_ok(source) or not _code_ok(target):
                     raise HttpError(400, "bad language code")
+                activity.emit("model", "log_model_asked", {"src": source, "tgt": target})
                 threading.Thread(target=_install_bg, args=(source, target), daemon=True, name=f"install-{source}-{target}").start()
                 return 202, {"started": True}, f"install {source}->{target}"
             raise HttpError(404, "not found")

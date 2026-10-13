@@ -33,6 +33,7 @@ namespace AutoTranslate
         public string DisableReason;
         public int Failures;
         public string LastFailure;
+        public readonly List<string> CoverSamples = new List<string>();   // first texts left alone because a translation file already has them (for the diagnostic)
         public readonly List<string> FailureLog = new List<string>();   // last 20 failures, for the problem report
 
         // counters (strings)
@@ -159,11 +160,13 @@ namespace AutoTranslate
         static string File_ { get { return Path.Combine(Dir, "modstates.json"); } }
         static string Marker { get { return Path.Combine(Dir, "applying.txt"); } }
         static Dictionary<string, string> disabled; // id -> reason
+        static Dictionary<string, int> suspects;    // id -> how many sessions in a row ended while this mod was being applied
 
         static Dictionary<string, string> Load()
         {
             if (disabled != null) return disabled;
             disabled = new Dictionary<string, string>();
+            suspects = new Dictionary<string, int>();
             try
             {
                 if (!File.Exists(File_)) return disabled;
@@ -171,6 +174,9 @@ namespace AutoTranslate
                 object m;
                 var mods = root != null && root.TryGetValue("disabled", out m) ? m as Dictionary<string, object> : null;
                 if (mods != null) foreach (var kv in mods) disabled[kv.Key] = Convert.ToString(kv.Value);
+                object sp;
+                var sus = root != null && root.TryGetValue("suspects", out sp) ? sp as Dictionary<string, object> : null;
+                if (sus != null) foreach (var kv in sus) { int n; if (int.TryParse(Convert.ToString(kv.Value), out n)) suspects[kv.Key] = n; }
             }
             catch (Exception ex) { AtLog.Error("state", "cannot read " + File_ + " (treated as empty)", ex); }
             return disabled;
@@ -184,6 +190,9 @@ namespace AutoTranslate
                 var sb = new StringBuilder("{\"disabled\":{");
                 bool first = true;
                 foreach (var kv in Load()) { if (!first) sb.Append(','); first = false; sb.Append(Json.Quote(kv.Key)).Append(':').Append(Json.Quote(kv.Value)); }
+                sb.Append("},\"suspects\":{");
+                first = true;
+                foreach (var kv in suspects) { if (!first) sb.Append(','); first = false; sb.Append(Json.Quote(kv.Key)).Append(':').Append(kv.Value); }
                 File.WriteAllText(File_, sb.Append("}}").ToString(), new UTF8Encoding(false));
             }
             catch (Exception ex) { AtLog.Error("state", "cannot write " + File_, ex); }
@@ -192,7 +201,11 @@ namespace AutoTranslate
         public static string GetDisabledReason(string id) { lock (Gate) { string r; return Load().TryGetValue(id, out r) ? r : null; } }
         public static void SetDisabled(string id, string reason) { lock (Gate) { Load()[id] = reason; Save(); } }
         public static void Clear(string id) { lock (Gate) { if (Load().Remove(id)) Save(); } }
-        public static void ResetForTests() { lock (Gate) { disabled = null; } }
+        public static void ResetForTests() { lock (Gate) { disabled = null; suspects = null; } }
+
+        /// <summary>Another session ended while this mod was being applied. Returns how many in a row (a clean quit resets the count).</summary>
+        public static int AddSuspect(string id) { lock (Gate) { Load(); int n; suspects.TryGetValue(id, out n); suspects[id] = ++n; Save(); return n; } }
+        public static void ClearSuspects() { lock (Gate) { Load(); if (suspects.Count > 0) { suspects.Clear(); Save(); } } }
 
         public static void SetApplying(string id)
         {

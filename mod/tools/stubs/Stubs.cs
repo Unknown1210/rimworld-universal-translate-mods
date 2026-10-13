@@ -107,8 +107,9 @@ namespace Verse
         public IEnumerable<Def> AllDefs { get { return defs; } }
     }
     public static class LoadedModManager { public static List<ModContentPack> RunningModsListForReading; }
-    public class Def { public string defName, label, description; string cachedLabelCap = "CACHED"; public string CapForTest { get { return cachedLabelCap; } } }
+    public class Def { public bool generated; public string defName, label, description; string cachedLabelCap = "CACHED"; public string CapForTest { get { return cachedLabelCap; } } }
     public class ThingDef : Def { }
+    public class RecipeDef : Def { }
     public class LanguageInfo { public string friendlyNameEnglish, friendlyNameNative; }
     public class DefInjectionPackage
     {
@@ -144,6 +145,7 @@ namespace Verse
         public static bool ButtonText(UnityEngine.Rect r, string s) { return false; }
         public static void CheckboxLabeled(UnityEngine.Rect r, string label, ref bool checkOn) { }
         public static void DrawHighlightIfMouseover(UnityEngine.Rect r) { }
+        public static string TextField(UnityEngine.Rect rect, string text) { return text; }
         public static void BeginScrollView(UnityEngine.Rect outRect, ref UnityEngine.Vector2 pos, UnityEngine.Rect view) { }
         public static void EndScrollView() { }
     }

@@ -150,6 +150,7 @@ namespace AutoTranslate
             stop = true;
             Safe.Run("cache", () => { if (cache != null) cache.SaveDirty(); });
             StateStore.ClearApplying();
+            StateStore.ClearSuspects();                      // a clean quit: nothing was left half applied
             AtLog.Info("pipeline", "game quitting. Final: " + Describe());
         }
 
@@ -197,8 +198,20 @@ namespace AutoTranslate
             if (stale != null)
             {
                 ModState sm;
+                int times = StateStore.AddSuspect(stale);
                 if (byId.TryGetValue(stale, out sm) && !sm.AutoDisabled)
-                    sm.Disable("the previous game session ended while this mod's translation was being applied (suspected cause)", null);
+                {
+                    if (times >= 2)
+                        sm.Disable("the previous " + times + " game sessions in a row ended while this mod's translation was being applied (suspected cause)", null);
+                    else
+                    {
+                        // The first time it may be nothing: the game closed or was killed while applying. Off for THIS session only and nothing is saved,
+                        // so the translation of this mod is not lost for good; a second time in a row is saved (a clean quit resets the count).
+                        sm.AutoDisabled = true;
+                        sm.DisableReason = "the previous game session ended while this mod's translation was being applied (suspected cause; off for this session only)";
+                        AtLog.Warn("registry", "previous session ended while applying '" + stale + "': its translation is off for this session only (use Re-enable to turn it on now)");
+                    }
+                }
                 else AtLog.Warn("registry", "previous session ended while applying '" + stale + "', which is not tracked/active now");
             }
             AtLog.Info("registry", Mods.Count + " mod(s) tracked");
@@ -251,6 +264,14 @@ namespace AutoTranslate
                 {
                     Item it = kv.Value;
                     string lang = ms.SourceOverride ?? LangDetect.ScriptLang(it.Source) ?? ms.LatinLang;
+                    if (ms.SourceOverride == null && it.Source.Length >= 60 && LangDetect.ScriptLang(it.Source) == null)
+                    {
+                        // A long Latin text tells its OWN language reliably: one already in the target language (a translated mod description, say) is NEVER
+                        // translated again, and one in a different language than the rest of the mod is translated from its own language.
+                        bool lc; string ld;
+                        string ownLang = LangDetect.LatinLang(new[] { it.Source }, out lc, out ld);
+                        if (lc) lang = ownLang;
+                    }
                     if (LangMap.Same(lang, Target)) { ms.AlreadyTarget++; drop.Add(kv.Key); continue; }
                     it.SourceLang = lang;
                     int n; ms.SourceCounts.TryGetValue(lang, out n); ms.SourceCounts[lang] = n + 1;
@@ -327,6 +348,7 @@ namespace AutoTranslate
         {
             if (ReferenceEquals(chosen.Provider, ms.Pack)) ms.Native++;
             else { ms.Third++; ms.CountProvider(chosen.Provider.Name); }
+            if (ms.CoverSamples.Count < 12) ms.CoverSamples.Add(origin + "  <-  '" + Clip(chosen.Value, 100) + "'  (" + Path.GetFileName(chosen.File) + " of " + chosen.Provider.PackageIdPlayerFacing + ")");
             // The game already shows 'effective' when it runs in the target language; only act when we must change it.
             if (!GameIsTarget || !ReferenceEquals(chosen, effective))
             {
@@ -370,6 +392,7 @@ namespace AutoTranslate
             {
                 Def d = def;
                 defs++;
+                if (d.generated && GameIsTarget && d is RecipeDef) continue;      // recipes the game made itself ("Fazer ISR2G", "Fazendo X.") are already in the game's language; making them "English" again gave "Fazenda ISR2G"
                 try
                 {
                     foreach (FieldInfo f0 in FieldsFor(d.GetType()))
@@ -687,6 +710,79 @@ namespace AutoTranslate
             if (mode == ModMode.Off) RevertMod(ms); else NeedsReload = true;
         }
 
+        /// <summary>One translation source for many mods at once (the "apply to all" menu). Mods the player turned off and mods switched off after
+        /// problems are left as they are. One reload at the end (when the settings window closes). Returns how many mods were changed.</summary>
+        public static int SetModeForAll(IEnumerable<ModState> mods, string mode)
+        {
+            var s = AutoTranslateMod.Settings;
+            if (s.modModes == null) s.modModes = new Dictionary<string, string>();
+            int n = 0;
+            foreach (ModState ms in mods)
+            {
+                if (ms.IsSelf || ms.Mode == ModMode.Off || ms.AutoDisabled) continue;
+                ms.Mode = mode;
+                if (mode == ModMode.Auto) s.modModes.Remove(ms.Id); else s.modModes[ms.Id] = mode;
+                n++;
+            }
+            if (n > 0) NeedsReload = true;
+            AtLog.Info("settings", "translation source '" + mode + "' applied to " + n + " mod(s) at once (applies when the settings window closes)");
+            return n;
+        }
+
+        /// <summary>A text report about one mod, to paste into a message: what this mod holds, which texts are waiting for a translation, whether the
+        /// translation file has them (and a near miss if the text differs by a few characters). It tells "not translated yet" apart from "translated but
+        /// not applied" and from a text that does not match the file.</summary>
+        public static string DiagnoseMod(ModState ms)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("Auto Translate diagnostic - mod '" + ms.Name + "' (" + ms.Id + ")");
+            sb.AppendLine("Version: " + typeof(Pipeline).Assembly.GetName().Version + " | target: " + (Target ?? "-") + " | game language is the target: " + GameIsTarget
+                + " | translations switched off: " + Suspended);
+            sb.AppendLine("Active: " + ms.Active + " | mode: " + ms.Mode + " | switched off after problems: " + ms.AutoDisabled + (ms.AutoDisabled ? " (" + ms.DisableReason + ")" : "")
+                + " | failures: " + ms.Failures);
+            int total = 0, applied = 0, waiting = 0, inCacheNotApplied = 0;
+            var sample = new List<string>();
+            var keys = cache != null ? cache.Keys(ms.Id) : new List<string>();
+            foreach (Item it in items.Values)
+            {
+                if (it.Mod != ms || it.Preset) continue;
+                total++;
+                if (it.Text != null) { applied++; continue; }
+                waiting++;
+                string tr = null;
+                bool inCache = cache != null && cache.TryGet(ms.Id, it.Source, out tr);
+                if (inCache) inCacheNotApplied++;
+                if (sample.Count < 15)
+                {
+                    string near = "";
+                    if (!inCache)
+                    {
+                        string k = TranslationCache.Norm(it.Source), best = null; int bestLen = 0;
+                        foreach (string key in keys)
+                        {
+                            int n = 0, max = Math.Min(key.Length, k.Length);
+                            while (n < max && key[n] == k[n]) n++;
+                            if (n > bestLen) { bestLen = n; best = key; }
+                        }
+                        if (best != null && bestLen >= 20) near = " | NEAR MISS in the file (same first " + bestLen + " characters): '" + Clip(best, 160) + "'";
+                    }
+                    sample.Add("  [" + it.Origin + "] '" + Clip(it.Source, 160) + "' | in translation file: " + (inCache ? "YES (but not applied!)" : "no") + near);
+                }
+            }
+            sb.AppendLine("Texts this mod needs translated: " + total + " | translated and applied: " + applied + " | waiting: " + waiting
+                + " | waiting although the file HAS them: " + inCacheNotApplied);
+            sb.AppendLine("Already in the target language: " + ms.AlreadyTarget + " | own translation: " + ms.Native + " | other mod's translation: " + ms.Third + " | placeholder files: " + ms.Placeholders);
+            sb.AppendLine("Translation file: " + (cache != null ? cache.FilePath(ms.Id) : "-") + " | exists: " + (cache != null && File.Exists(cache.FilePath(ms.Id))) + " | entries: " + keys.Count);
+            if (ms.CoverSamples.Count > 0)
+            {
+                sb.AppendLine("Texts left alone because a translation file of a mod already has them (first " + ms.CoverSamples.Count + "; if these still show in English the file only repeats the original):");
+                foreach (string l in ms.CoverSamples) sb.AppendLine("  " + l);
+            }
+            if (sample.Count > 0) { sb.AppendLine("Waiting texts (first " + sample.Count + "):"); foreach (string l in sample) sb.AppendLine(l); }
+            lock (ms.FailureLog) { if (ms.FailureLog.Count > 0) { sb.AppendLine("Problems recorded:"); foreach (string l in ms.FailureLog) sb.AppendLine("  " + l); } }
+            return sb.ToString();
+        }
+
         /// <summary>Force a mod's source language (null/"auto" = detect). Takes effect on next start.</summary>
         public static void SetSourceLang(ModState ms, string code)
         {
@@ -700,6 +796,7 @@ namespace AutoTranslate
         {
             ms.AutoDisabled = false; ms.DisableReason = null; ms.Failures = 0;
             StateStore.Clear(ms.Id);
+            StateStore.ClearSuspects();
             NeedsReload = true;
             AtLog.Info("settings", "mod '" + ms.Id + "' re-enabled (applies when the settings window closes)");
         }
@@ -707,21 +804,58 @@ namespace AutoTranslate
         public static int TargetPollMs = 3000;      // tests lower this
         static int lastPoll;
 
-        static string extSig = "";
+        public static int CachePollMs = 1500;      // while the translator program is translating (tests lower this)
+        public static int IdlePollMs = 5000;       // otherwise: only the one small flag file is looked at (tests lower this)
+        static int lastCachePoll;
+        static bool translatorBusy;
 
-        /// <summary>The translator program can write new translations (its "Translate mods" tab) while the game is open. When the cache files change
-        /// outside the game and stay unchanged for one more check (the program may still be writing), reload so the new translations show up now
-        /// instead of after a restart.</summary>
+        /// <summary>The translator program touches a flag file every 2 seconds while its "Translate mods" tab is running; a flag older than 10 s is a crash.</summary>
+        static bool TranslatorBusy()
+        {
+            try
+            {
+                string f = Path.Combine(Paths.DataDir, "bulk-running.flag");
+                return File.Exists(f) && (DateTime.UtcNow - File.GetLastWriteTimeUtc(f)).TotalSeconds < 10;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>The translator program can write translations (its "Translate mods" tab) while the game is open. As soon as a mod's cache file changes,
+        /// apply what is new to that mod, right now: no reload, nothing else is touched. A palette translated by the program shows its new name and
+        /// description within a couple of seconds, without restarting the game.</summary>
         static void PollCache()
         {
             var s = AutoTranslateMod.Settings;
-            if (cache == null || Target == null || s == null || !s.enabled || !WorkerFinished) return;
-            string sig = cache.ExternalSignature();
-            if (sig.Length == 0) { extSig = ""; return; }
-            if (sig != extSig) { extSig = sig; return; }
-            extSig = "";
-            AtLog.Info("pipeline", "translation files changed outside the game (the translator program); reloading to apply them");
-            Reload();
+            if (cache == null || Target == null || s == null || !s.enabled) return;
+            // Nothing to do (and nothing worth the game's time) unless the program is translating, plus ONE last look right after it stops.
+            bool busy = TranslatorBusy();
+            bool look = busy || translatorBusy;
+            translatorBusy = busy;
+            if (!look) return;
+            List<string> changed = cache.ExternalChanges();
+            foreach (string name in changed)
+            {
+                ModState ms = null;
+                foreach (ModState m in Mods)
+                    if (!m.IsSelf && string.Equals(Paths.SafeFileName(m.Id), name, StringComparison.OrdinalIgnoreCase)) { ms = m; break; }
+                if (ms == null || !ms.Active) continue;
+                int n = 0;
+                SetMarker(ms);
+                try
+                {
+                    foreach (Item it in items.Values)
+                    {
+                        if (it.Mod != ms || it.Preset) continue;
+                        string tr;
+                        if (!cache.TryGet(ms.Id, it.Source, out tr) || tr == it.Text) continue;
+                        if (it.Text == null) { ms.FromCache++; FromCache++; }
+                        ApplyItem(it, tr);
+                        n++;
+                    }
+                }
+                finally { SetMarker(null); }
+                if (n > 0) AtLog.Info("pipeline", "translation file of mod '" + ms.Id + "' changed outside the game: " + n + " text(s) applied now");
+            }
         }
 
         /// <summary>The player may change the target language in the translator program while the game runs: notice it and reload.</summary>
@@ -741,7 +875,8 @@ namespace AutoTranslate
         public static void Tick()
         {
             int now = Environment.TickCount;
-            if (unchecked(now - lastPoll) >= TargetPollMs) { lastPoll = now; Safe.Run("poll", PollTarget); Safe.Run("poll-cache", PollCache); }
+            if (unchecked(now - lastPoll) >= TargetPollMs) { lastPoll = now; Safe.Run("poll", PollTarget); }
+            if (unchecked(now - lastCachePoll) >= (translatorBusy ? CachePollMs : IdlePollMs)) { lastCachePoll = now; Safe.Run("poll-cache", PollCache); }
             if (disabledQueue.IsEmpty && results.IsEmpty) return;
             try
             {
@@ -1059,7 +1194,7 @@ namespace AutoTranslate
             try
             {
                 string text; if (!Canary.TryGetValue(src, out text)) text = "Hello.";
-                string rid; var r = HelperClient.Translate(src, Target, new[] { text }, out rid);
+                string rid; var r = HelperClient.Translate(src, Target, new[] { text }, out rid, "(translator check)");
                 return r.Count == 1 && !string.IsNullOrWhiteSpace(r[0]);
             }
             catch (Exception e) { AtLog.Warn("worker", "canary translation failed: " + e.Message); return false; }
@@ -1075,7 +1210,7 @@ namespace AutoTranslate
                 string rid = "-";
                 try
                 {
-                    List<string> res = HelperClient.Translate(src, Target, texts, out rid);
+                    List<string> res = HelperClient.Translate(src, Target, texts, out rid, ms.Id);
                     for (int i = 0; i < batch.Count; i++) Accept(ms, batch[i], res[i], rid, gen);
                     return;
                 }

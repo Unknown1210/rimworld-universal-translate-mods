@@ -16,10 +16,11 @@ import json
 import os
 import re
 import threading
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import config, langdetect, languages, logsetup, models, server, updater
+from . import activity, config, langdetect, languages, logsetup, models, server, updater
 from .paths import data_dir
 
 log = logsetup.get("bulk")
@@ -398,7 +399,13 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
     log.info("mod %s: Latin-script texts look %s (%s%s)", mod.package_id, lat, "confident; " if conf else "weak, assuming English; ", detail)
     groups = {}
     for text in items:
-        lang = langdetect.script_lang(text) or lat
+        lang = langdetect.script_lang(text)
+        if lang is None:
+            lang = lat
+            if len(text) >= 60:                       # a long text tells its OWN language reliably: one already in the target language is never translated again
+                own, conf, _d = langdetect.latin_lang([text])
+                if conf:
+                    lang = own
         if languages.same(lang, target):
             res.already_target += 1
             if len(res.skipped) < SKIP_LIST_MAX:
@@ -434,11 +441,44 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
     if new_entries:
         cache.update(new_entries)
         write_cache(target, mod.package_id, cache)
+    activity.emit("bulk", "log_bulk_mod", {"name": mod.name, "texts": res.texts, "translated": res.translated, "cache": res.from_cache,
+                                           "covered": res.covered, "already": res.already_target, "failed": res.failed, "words": res.words,
+                                           "unsupported": ", ".join(res.unsupported) or "-"},
+                  level="warning" if (res.failed or res.unsupported) else "info", pairs=list(new_entries.items()))
     return res
 
 
+FLAG_NAME = "bulk-running.flag"
+
+
 def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True):
-    """Translate pending (new/changed) mods, or all with force=True. Returns the list of ModResult."""
+    """Translate pending (new/changed) mods, or all with force=True. Returns the list of ModResult.
+    While it runs, a small flag file (<data>/bulk-running.flag) is touched every 2 seconds: the game, if it is open, only looks at the
+    translations files while that flag is fresh (and once more when it goes away), so it does not have to keep checking."""
+    flag = data_dir() / FLAG_NAME
+    stop = threading.Event()
+
+    def beat():
+        while not stop.is_set():
+            try:
+                flag.write_text(str(time.time()))
+            except OSError:
+                pass
+            stop.wait(2.0)
+    t = threading.Thread(target=beat, daemon=True, name="bulk-flag")
+    t.start()
+    try:
+        return _run(target, dirs, force, progress, cancel, only_pending)
+    finally:
+        stop.set()
+        t.join(timeout=3)
+        try:
+            flag.unlink()
+        except OSError:
+            pass
+
+
+def _run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True):
     progress = progress or (lambda e: None)
     items = plan(target, dirs)
     mods = [m for m, _s, _r in items]
@@ -465,19 +505,23 @@ def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending
 
     results, total = [], len(todo)
     progress({"event": "start", "total": total, "all": len(mods)})
+    activity.emit("bulk", "log_bulk_start", {"total": total, "all": len(mods), "target": target})
     st = state_load()
     st.setdefault(target, {})
     for i, (m, status) in enumerate(todo):
         if cancel and cancel.is_set():
             progress({"event": "cancelled", "done": i, "total": total})
+            activity.emit("bulk", "log_bulk_cancelled", {"done": i, "total": total}, level="warning")
             break
         progress({"event": "mod_start", "index": i, "total": total, "name": m.name, "status": status})
+        activity.emit("bulk", "log_bulk_mod_start", {"name": m.name, "i": i + 1, "total": total, "status": status})
         try:
             r = process_mod(m, target, coverage, cancel, progress, ensure_model=ensure_model)
         except Exception as e:  # noqa: BLE001 - one broken mod must not stop the rest
             log.error("mod %s failed during bulk translation", m.package_id, exc_info=True)
             r = ModResult(m)
             r.error = f"{type(e).__name__}: {e}"
+            activity.emit("bulk", "log_bulk_mod_error", {"name": m.name, "err": r.error}, level="error")
         results.append(r)
         if not (cancel and cancel.is_set()) and r.error is None:
             st[target][m.package_id] = r.to_state(m.fingerprint or fingerprint(m))
@@ -485,4 +529,5 @@ def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending
         progress({"event": "mod_done", "index": i + 1, "total": total, "result": r})
     else:
         progress({"event": "finished", "done": total, "total": total})
+        activity.emit("bulk", "log_bulk_finished", {"total": total})
     return results

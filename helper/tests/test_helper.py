@@ -151,6 +151,22 @@ class Api(unittest.TestCase):
         c, j = self.call("/suggest?game=Fran%C3%A7ais")
         self.assertEqual(j["suggested"], "fr")
 
+    def test_game_requests_are_written_to_the_activity_log(self):
+        """The Log tab shows what the game asked for: the mod and every original text with its translation."""
+        from rwtranslate import activity
+        activity.clear()
+        c, j = self.call("/translate", {"target": "pt", "mod": "somebody.searchandrescue", "texts": ["Search and rescue", "Rescue all"]})
+        self.assertEqual(c, 200)
+        games = [e for e in activity.snapshot() if e.kind == "game"]
+        self.assertEqual(len(games), 1)
+        e = games[0]
+        self.assertEqual((e.key, e.args["mod"], e.args["n"], e.args["src"], e.args["tgt"]), ("log_game_batch", "somebody.searchandrescue", 2, "en", "pt"))
+        self.assertEqual([a for a, _b in e.pairs], ["Search and rescue", "Rescue all"])
+        self.assertEqual([b for _a, b in e.pairs], j["translations"], "each original is listed with its translation")
+        self.assertIn("Search and rescue", e.detail_text())
+        c, j = self.call("/translate", {"target": "pt", "texts": ["Hello"]})                  # an older mod version sends no mod name
+        self.assertEqual([x for x in activity.snapshot() if x.kind == "game"][-1].args["mod"], "?")
+
     def test_translate(self):
         c, j = self.call("/translate", {"target": "pt", "texts": ["Hello", "The colonist {0} was hit by a raider"]})
         self.assertEqual(c, 200)

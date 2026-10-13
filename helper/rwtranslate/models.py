@@ -10,7 +10,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from . import languages, logsetup
+from . import activity, languages, logsetup
 from .paths import models_dir
 
 log = logsetup.get("models")
@@ -137,11 +137,13 @@ def _install_pair(src, tgt, progress, index):
     if dest.exists():
         shutil.rmtree(dest)
     progress(f"Baixando modelo {src}->{tgt} ({url}) ...")
+    activity.emit("model", "log_model_download", {"src": src, "tgt": tgt, "url": url})
     log.info("downloading model %s->%s version=%s url=%s", src, tgt, pkg["package_version"], url)
     try:
         _download_and_unpack(url, tmp, dest, progress)
     except Exception:
         log.exception("model install FAILED %s->%s url=%s dest=%s", src, tgt, url, dest)
+        activity.emit("model", "log_model_failed", {"src": src, "tgt": tgt}, level="error")
         if tmp.exists():
             tmp.unlink()
         shutil.rmtree(dest, ignore_errors=True)  # never leave a half-installed model
@@ -149,6 +151,7 @@ def _install_pair(src, tgt, progress, index):
     (dest / "ok").write_text(str(pkg["package_version"]))
     log.info("model %s->%s installed (%d files)", src, tgt, sum(1 for _ in dest.rglob("*")))
     progress("Modelo instalado.")
+    activity.emit("model", "log_model_done", {"src": src, "tgt": tgt})
 
 
 def _download_and_unpack(url, tmp, dest, progress):

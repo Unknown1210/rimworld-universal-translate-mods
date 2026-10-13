@@ -37,28 +37,31 @@ namespace AutoTranslate
             }
         }
 
-        /// <summary>Cache files that were added, changed or deleted by someone else since we last looked (the translator program's "Translate mods" run
-        /// writes the same files while the game is open). Empty text = nothing changed. Our own writes are not counted.</summary>
-        public string ExternalSignature()
+        /// <summary>Cache files that were added or changed by someone else since we last looked (the translator program's "Translate mods" run writes
+        /// the same files while the game is open); each change is reported once. Returns the bucket names (the mod ids). The new entries are merged into
+        /// the buckets already loaded in memory (the file wins for a text both have); our own writes are not reported.</summary>
+        public List<string> ExternalChanges()
         {
-            var sb = new StringBuilder();
+            var names = new List<string>();
             lock (gate)
             {
                 try
                 {
-                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    if (Directory.Exists(Dir))
-                        foreach (string f in Directory.GetFiles(Dir, "*.json"))
-                        {
-                            seen.Add(f);
-                            long t = File.GetLastWriteTimeUtc(f).Ticks, old;
-                            if (!known.TryGetValue(f, out old) || old != t) sb.Append(Path.GetFileName(f)).Append(':').Append(t).Append(';');
-                        }
-                    foreach (string f in known.Keys) if (!seen.Contains(f)) sb.Append(Path.GetFileName(f)).Append(":gone;");
+                    if (!Directory.Exists(Dir)) return names;
+                    foreach (string f in Directory.GetFiles(Dir, "*.json"))
+                    {
+                        long t = File.GetLastWriteTimeUtc(f).Ticks, old;
+                        if (known.TryGetValue(f, out old) && old == t) continue;
+                        known[f] = t;
+                        names.Add(Path.GetFileNameWithoutExtension(f));
+                        foreach (Bucket b in buckets.Values)
+                            if (string.Equals(b.Path, f, StringComparison.OrdinalIgnoreCase))
+                                foreach (var kv in NormKeys(ReadEntries(f, "cache"))) b.Entries[kv.Key] = kv.Value;
+                    }
                 }
                 catch (Exception e) { AtLog.Warn("cache", "cannot check cache files for outside changes", e); }
             }
-            return sb.ToString();
+            return names;
         }
 
         /// <summary>Cache key of a text. MUST match bulk.normalize in the helper (shared test vectors): the helper pre-translates mods
@@ -143,6 +146,10 @@ namespace AutoTranslate
             source = Norm(source);
             lock (gate) { var b = Load(bucket); b.Entries[source] = translation; b.Dirty = true; }
         }
+
+        public List<string> Keys(string bucket) { lock (gate) { return new List<string>(Load(bucket).Entries.Keys); } }
+
+        public string FilePath(string bucket) { return BucketPath(bucket); }
 
         public int Count(string bucket) { lock (gate) { return Load(bucket).Entries.Count; } }
 

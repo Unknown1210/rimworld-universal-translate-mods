@@ -7,7 +7,7 @@
     <li>1.6</li>
   </supportedVersions>
   <description>
-UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.008): expect bugs, and report them.
+UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.009): expect bugs, and report them.
 
 WHAT IT DOES
 Automatically translates the OTHER mods you have installed (names, descriptions, interface texts and the descriptions on this Mods screen) into the language you choose. It detects each mod's language by itself (English, Chinese, Russian...). Texts that already have a translation, from the mod itself or from a translation mod, are left alone. If one mod causes a problem, only that mod is switched off.
@@ -18,7 +18,7 @@ A RimWorld mod only runs inside the game and cannot carry a translation engine (
 STEP BY STEP
 1. Install the Harmony mod (Steam Workshop).
 2. Download UniversalTranslate-Helper.exe from the Releases page of the GitHub project (link below).
-3. Double-click it. A window opens (no black console window). Choose your target language by name there (the game uses the same one) and wait for the model to download. Keep the window open while you play RimWorld. It is only needed while something is being translated during the game: if everything is already translated you do not need it any more and can play with the program closed (open it again when you install or update mods).
+3. Double-click it. A window opens (no black console window). Choose your target language by name there (the game uses the same one) and wait for the model to download. Keep the window open while you play RimWorld. It is only needed while something is being translated during the game: if everything is already translated you do not need it any more and can play with the program closed (open it again when you install or update mods). Note: texts that only exist inside the game (such as the action buttons of the Orders tab that some mods build in code) cannot be translated beforehand: for those, open the program BEFORE starting RimWorld and play with it open, so it translates and saves them in the cache. Next time they are ready. If you translate or update mods while the game is open and you do not see the translation applied, restart the game so it gets applied.
 4. Enable Harmony, then Auto Translate (in this order) and start the game.
 5. The first translation takes a few minutes; after that it is instant. To get ahead, use the "Translate mods" tab of the .exe: it translates every installed mod, even the ones not enabled, with a progress bar, and finds new mods later. Game options: Options > Mods > Auto Translate (switch translations off to compare with the originals - also with a keyboard shortcut you choose - and see which mods are supported).
 Updates: use the "Check for updates" button in the .exe window.
@@ -30,7 +30,7 @@ Nothing is sent over the internet except the one-time model download and the upd
 
 ----------------------------------------
 
-EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.008): podem existir erros, avise.
+EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.009): podem existir erros, avise.
 
 O QUE FAZ
 Traduz automaticamente os OUTROS mods que você instalou (nomes, descrições, textos de interface e as descrições desta tela de Mods) para o idioma que você escolher. Detecta sozinho o idioma de cada mod (inglês, chinês, russo...). Textos que já têm tradução, do próprio mod ou de um mod de tradução, não são mexidos. Se um mod der problema, só ele é desligado.
@@ -41,7 +41,7 @@ Um mod do RimWorld só roda dentro do jogo e não consegue carregar um motor de 
 PASSO A PASSO
 1. Instale o mod Harmony (Steam Workshop).
 2. Baixe o UniversalTranslate-Helper.exe na página de Releases do projeto no GitHub (link abaixo).
-3. Dê dois cliques. Abre uma janela (sem janela preta). Escolha lá o idioma de destino pelo nome (o jogo usa o mesmo) e espere o modelo baixar. Deixe a janela aberta enquanto joga RimWorld. Ela só é necessária enquanto algo estiver sendo traduzido durante o jogo: se tudo já estiver traduzido, você não precisa mais dela e pode jogar com o programa fechado (abra de novo ao instalar ou atualizar mods).
+3. Dê dois cliques. Abre uma janela (sem janela preta). Escolha lá o idioma de destino pelo nome (o jogo usa o mesmo) e espere o modelo baixar. Deixe a janela aberta enquanto joga RimWorld. Ela só é necessária enquanto algo estiver sendo traduzido durante o jogo: se tudo já estiver traduzido, você não precisa mais dela e pode jogar com o programa fechado (abra de novo ao instalar ou atualizar mods). Atenção: textos que só existem dentro do jogo (como os botões de ações da aba Ordens que alguns mods criam em código) não dá para traduzir antes: para eles, abra o programa ANTES de iniciar o RimWorld e jogue com ele aberto, para que ele traduza e salve no cache. Nas próximas vezes já ficam prontos. Se você traduzir ou atualizar os mods com o jogo aberto e não vir a tradução aplicada, reinicie o jogo para que ela seja aplicada.
 4. Ative Harmony e depois Auto Translate (nessa ordem) e inicie o jogo.
 5. A primeira tradução leva alguns minutos; depois é instantânea. Para adiantar, use a aba "Traduzir mods" do .exe: ele traduz todos os mods instalados, mesmo os que não estão ativados, com barra de progresso, e acha mods novos depois. Opções no jogo: Opções > Mods > Auto Translate (desativar traduções para comparar com o original - também com um atalho de teclado que você escolhe - e ver quais mods têm suporte).
 Atualizações: use o botão "Procurar atualização" na janela do .exe.

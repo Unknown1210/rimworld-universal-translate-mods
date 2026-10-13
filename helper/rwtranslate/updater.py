@@ -21,7 +21,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import __version__, logsetup
+from . import __version__, activity, logsetup
 from .paths import data_dir
 
 log = logsetup.get("updater")
@@ -162,6 +162,7 @@ def check(fetcher=fetch):
         return Check(error=f"Erro inesperado: {type(e).__name__}: {e}")
     avail = rel.version > current_version()
     log.info("update check: current=%s latest=%s available=%s", __version__, rel.tag, avail)
+    activity.emit("update", "log_update_check", {"current": __version__, "latest": rel.tag, "available": "sim" if avail else "não"})
     return Check(available=avail, latest=rel.tag, notes=rel.notes, release=rel)
 
 
@@ -243,6 +244,7 @@ def update_helper(rel, fetcher=fetch, progress=None, exe_path=None):
     data = download_verified(rel, HELPER_ASSET, fetcher, progress)
     _swap(target, data)
     log.info("helper updated to %s at %s", rel.tag, target)
+    activity.emit("update", "log_update_helper", {"tag": rel.tag})
     return target
 
 
@@ -372,6 +374,7 @@ def update_mod(rel, mod_dir, fetcher=fetch, progress=None):
                 raise UpdateError(f"Não consegui gravar {dest} ({e.strerror or e}). Se o RimWorld estiver aberto, feche-o e atualize de novo.")
             written += 1
     log.info("mod updated to %s in %s (%d files)", rel.tag, mod_dir, written)
+    activity.emit("update", "log_update_mod", {"tag": rel.tag, "n": written})
     return written
 
 

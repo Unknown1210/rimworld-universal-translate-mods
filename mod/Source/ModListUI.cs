@@ -11,6 +11,7 @@ namespace AutoTranslate
     {
         const float RowH = 72f;
         static Vector2 scroll;
+        static string search = "";
 
         public static void Draw(Rect rect)
         {
@@ -20,9 +21,36 @@ namespace AutoTranslate
         static void DrawInner(Rect rect)
         {
             var mods = new List<ModState>();
-            foreach (ModState m in Pipeline.Mods) if (!m.IsSelf) mods.Add(m);
-            Widgets.Label(new Rect(rect.x, rect.y, rect.width, 26f), T.Get("AT_Mods", mods.Count) + "  -  " + T.Get("AT_ModsHint"));
-            var outRect = new Rect(rect.x, rect.y + 28f, rect.width, Math.Max(40f, rect.height - 28f));
+            int all = 0;
+            string q = (search ?? "").Trim();
+            foreach (ModState m in Pipeline.Mods)
+            {
+                if (m.IsSelf) continue;
+                all++;
+                if (q.Length == 0 || m.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0 || m.Id.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0) mods.Add(m);
+            }
+            Widgets.Label(new Rect(rect.x, rect.y, rect.width, 26f), T.Get("AT_Mods", q.Length == 0 ? all.ToString() : mods.Count + "/" + all) + "  -  " + T.Get("AT_ModsHint"));
+            // search box (filters the list below) and the "apply to all shown" menu
+            float sw = Math.Min(260f, rect.width * 0.4f);
+            Widgets.Label(new Rect(rect.x, rect.y + 28f, 130f, 26f), T.Get("AT_Search"));
+            search = Widgets.TextField(new Rect(rect.x + 130f, rect.y + 28f, sw, 26f), search ?? "");
+            float aw = Math.Min(320f, rect.width - sw - 150f);
+            if (aw > 120f && Widgets.ButtonText(new Rect(rect.x + rect.width - aw, rect.y + 28f, aw, 26f), T.Get("AT_ApplyAll", mods.Count)))
+            {
+                var shown = new List<ModState>(mods);
+                var opts = new List<FloatMenuOption>();
+                foreach (string mode in ModMode.All)
+                {
+                    if (mode == ModMode.Off) continue;
+                    string md = mode;
+                    opts.Add(new FloatMenuOption(T.Get("AT_ApplyAllTo", ModMode.Label(md), shown.Count), () => Pipeline.SetModeForAll(shown, md)));
+                }
+                var disabledShown = shown.FindAll(m => m.AutoDisabled);
+                if (disabledShown.Count > 0)
+                    opts.Add(new FloatMenuOption(T.Get("AT_ReenableAll", disabledShown.Count), () => { foreach (ModState dm in disabledShown) Pipeline.Reenable(dm); }));
+                Find.WindowStack.Add(new FloatMenu(opts));
+            }
+            var outRect = new Rect(rect.x, rect.y + 58f, rect.width, Math.Max(40f, rect.height - 58f));
             var view = new Rect(0f, 0f, outRect.width - 18f, mods.Count * RowH);
             Widgets.BeginScrollView(outRect, ref scroll, view);
             float y = 0f;
@@ -31,7 +59,18 @@ namespace AutoTranslate
                 var row = new Rect(0f, y, view.width, RowH - 4f);
                 Widgets.DrawHighlightIfMouseover(row);
                 float w = view.width, split = w * 0.60f;
-                Widgets.Label(new Rect(row.x + 4f, row.y, split - 8f, 24f), ms.Name + "  (" + ms.Id + ")");
+                Widgets.Label(new Rect(row.x + 4f, row.y, split - 108f, 24f), ms.Name + "  (" + ms.Id + ")");
+                if (Widgets.ButtonText(new Rect(row.x + split - 100f, row.y + 1f, 96f, 22f), T.Get("AT_BtnDiag")))
+                {
+                    ModState dm = ms;
+                    Safe.Run("diagnose", () =>
+                    {
+                        string report = Pipeline.DiagnoseMod(dm);
+                        GUIUtility.systemCopyBuffer = report;
+                        AtLog.Info("diagnose", report);
+                        Messages.Message(T.Get("AT_DiagCopied", dm.Name), RimWorld.MessageTypeDefOf.SilentInput, false);
+                    });
+                }
                 GameFont old = Text.Font;
                 Text.Font = GameFont.Tiny;
                 Widgets.Label(new Rect(row.x + 4f, row.y + 24f, split - 8f, RowH - 28f), ms.StatusTextUi());
