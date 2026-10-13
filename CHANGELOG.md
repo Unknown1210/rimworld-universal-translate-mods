@@ -4,6 +4,10 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.007 - 2026-10-13
+- Alterado: no README, a linha divisória passa a separar TODOS os itens de TODAS as listas (numeradas e com marcadores), e não só os de "Como funciona", "Instalação" e "Aviso do Windows": 10 listas, 32 divisórias. A divisória ficou curta e simples (uma linha curta de traço no fim de cada item, sem o espaço grande da linha larga de antes). As listas numeradas voltam a seguir na sequência normal (1, 2, 3...).
+- Não validado ainda: como o GitHub mostra as divisórias curtas (conferido só em um conversor local de Markdown).
+
 ## v0.006 - 2026-10-13
 - Corrigido: a v0.005 não gerou release (nem `.exe` nem zip): o teste da janela falhou no Windows do GitHub, porque pedia uma janela de 1300 px e a tela do servidor é menor, e a release só sai se os testes passam. O teste agora usa larguras que cabem na tela (820 a 960 px). Esta versão traz tudo o que estava na v0.005, que ficou sem arquivos para baixar.
 - Alterado: o README inteiro fica justificado, inclusive a tabela de compatibilidade (agora em HTML, com as células justificadas), e o título "Universal Translate for RimWorld" fica centralizado.
