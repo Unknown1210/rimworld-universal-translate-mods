@@ -97,6 +97,8 @@ public static class Harness
         Scenario7_ScreenTextsAndCache(home);
         Scenario8_SharedConfigAndHelperCache(home);
         Scenario9_PlaceholderTranslationFiles(home);
+        Scenario10_Designators(home);
+        Scenario11_TranslationsWrittenWhileGameRuns(home);
 
         // ---- Crash report + log content
         string crash = CrashReporter.WriteReport("test", new InvalidOperationException("outer", new ArgumentException("inner cause")));
@@ -463,6 +465,68 @@ public static class Harness
         Pipeline.SetSuspended(true);
         Check(armchair.description == "A large, soft, comfy seat." && couch.description == "Um sofá macio para dois colonos.", "OFF restores exactly what the game had");
         Pipeline.SetSuspended(false);
+    }
+
+    sealed class TestDesignator : Designator { }
+
+    static void Scenario10_Designators(string home)
+    {
+        Console.WriteLine("== scenario 10: buttons built in code by a mod (Orders tab), created before the mod runs");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "ds", "m"), Name = "Designator Mod", PackageIdPlayerFacing = "g.designators" };
+        mod.assemblies.loadedAssemblies.Add(typeof(TestDesignator).Assembly);
+        var core = new ModContentPack { RootDir = Path.Combine(home, "ds", "core"), Name = "Core", PackageIdPlayerFacing = "ludeon.rimworld", IsCoreMod = true };
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { core, mod };
+        var rescue = new TestDesignator { defaultLabel = "Search and rescue", defaultDesc = "Rescue all downed colonists." };
+        var built = new RimWorld.Designator_Build { defaultLabel = "Wooden pallet" };
+        var already = new TestDesignator { defaultLabel = "铁剑" };
+        var empty = new TestDesignator();
+        var cat = new DesignationCategoryDef { defName = "Orders" };
+        cat.designators.AddRange(new Designator[] { rescue, built, already, empty });
+        DefDatabase<DesignationCategoryDef>.list.Clear();
+        DefDatabase<DesignationCategoryDef>.list.Add(cat);
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };
+        Run("pt");
+        Check(rescue.defaultLabel == "Search and rescue (pt)" && rescue.defaultDesc == "Rescue all downed colonists. (pt)", "button text built in code is translated: '" + rescue.defaultLabel + "' / '" + rescue.defaultDesc + "'");
+        Check(built.defaultLabel == "Wooden pallet", "buildings are left to the def translation (not touched here)");
+        Check(already.defaultLabel == "铁剑 (pt from zh)", "a Chinese button is translated from Chinese: '" + already.defaultLabel + "'");
+        Check(empty.defaultLabel == null, "an empty label is left alone");
+        Pipeline.SetSuspended(true);
+        Check(rescue.defaultLabel == "Search and rescue" && rescue.defaultDesc == "Rescue all downed colonists.", "OFF restores the original button text");
+        Pipeline.SetSuspended(false);
+        DefDatabase<DesignationCategoryDef>.list.Clear();
+    }
+
+    static void Scenario11_TranslationsWrittenWhileGameRuns(string home)
+    {
+        Console.WriteLine("== scenario 11: the translator program writes translations while the game is open");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "lv", "m"), Name = "Live Mod", PackageIdPlayerFacing = "h.live" };
+        var table = new ThingDef { defName = "Table", label = "electric table", description = "An advanced work table." };
+        mod.defs.Add(table);
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };
+        Run("pt");
+        Check(table.label == "electric table (pt)", "first run: translated by the (fake) helper: " + table.label);
+        // the program rewrites the cache file of this mod (as its bulk run does: new file, new write time)
+        string f = Path.Combine(Path.Combine(Paths.CacheDir, Pipeline.Target), "h.live.json");
+        File.WriteAllText(f, "{\"format\":1,\"entries\":{\"electric table\":\"mesa elétrica\",\"An advanced work table.\":\"Uma mesa avançada.\"}}", new System.Text.UTF8Encoding(false));
+        File.SetLastWriteTimeUtc(f, DateTime.UtcNow.AddMinutes(5));
+        int oldPoll = Pipeline.TargetPollMs;
+        Pipeline.TargetPollMs = 40;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (table.label != "mesa elétrica" && sw.Elapsed.TotalSeconds < 8) { Thread.Sleep(30); Pipeline.Tick(); }
+        WaitWorker(System.Diagnostics.Stopwatch.StartNew());
+        Pipeline.TargetPollMs = oldPoll;
+        Check(table.label == "mesa elétrica" && table.description == "Uma mesa avançada.", "translations written outside the game show up without a restart: '" + table.label + "'");
+        // a file written by the game itself is NOT taken for an outside change (no reload loop)
+        var before = Pipeline.Describe();
+        Pipeline.TargetPollMs = 40;
+        for (int i = 0; i < 20; i++) { Thread.Sleep(30); Pipeline.Tick(); }
+        Pipeline.TargetPollMs = oldPoll;
+        Check(table.label == "mesa elétrica", "nothing changes while nobody touches the files");
     }
 
     static void Scenario4_CrashMarker(string home)

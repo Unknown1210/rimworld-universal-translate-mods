@@ -21,7 +21,45 @@ namespace AutoTranslate
         readonly Dictionary<string, Bucket> buckets = new Dictionary<string, Bucket>();
         Dictionary<string, string> overrides;
 
-        public TranslationCache(string targetLang) { target = targetLang; }
+        readonly Dictionary<string, long> known = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);   // cache file -> last write time when we last read/wrote it
+
+        public TranslationCache(string targetLang) { target = targetLang; Snapshot(); }
+
+        string Dir { get { return Path.Combine(Paths.CacheDir, target); } }
+
+        void Snapshot()
+        {
+            lock (gate)
+            {
+                known.Clear();
+                try { if (Directory.Exists(Dir)) foreach (string f in Directory.GetFiles(Dir, "*.json")) known[f] = File.GetLastWriteTimeUtc(f).Ticks; }
+                catch (Exception e) { AtLog.Warn("cache", "cannot list cache files", e); }
+            }
+        }
+
+        /// <summary>Cache files that were added, changed or deleted by someone else since we last looked (the translator program's "Translate mods" run
+        /// writes the same files while the game is open). Empty text = nothing changed. Our own writes are not counted.</summary>
+        public string ExternalSignature()
+        {
+            var sb = new StringBuilder();
+            lock (gate)
+            {
+                try
+                {
+                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (Directory.Exists(Dir))
+                        foreach (string f in Directory.GetFiles(Dir, "*.json"))
+                        {
+                            seen.Add(f);
+                            long t = File.GetLastWriteTimeUtc(f).Ticks, old;
+                            if (!known.TryGetValue(f, out old) || old != t) sb.Append(Path.GetFileName(f)).Append(':').Append(t).Append(';');
+                        }
+                    foreach (string f in known.Keys) if (!seen.Contains(f)) sb.Append(Path.GetFileName(f)).Append(":gone;");
+                }
+                catch (Exception e) { AtLog.Warn("cache", "cannot check cache files for outside changes", e); }
+            }
+            return sb.ToString();
+        }
 
         /// <summary>Cache key of a text. MUST match bulk.normalize in the helper (shared test vectors): the helper pre-translates mods
         /// from their XML files, the game finds those translations through this key even if whitespace or "\n" escapes differ.</summary>
@@ -136,6 +174,7 @@ namespace AutoTranslate
                     File.WriteAllText(tmp, sb.ToString(), new UTF8Encoding(false));
                     if (File.Exists(b.Path)) File.Delete(b.Path);
                     File.Move(tmp, b.Path);
+                    lock (gate) { known[b.Path] = File.GetLastWriteTimeUtc(b.Path).Ticks; }      // our own write: not an outside change
                     written++;
                 }
                 catch (Exception ex)

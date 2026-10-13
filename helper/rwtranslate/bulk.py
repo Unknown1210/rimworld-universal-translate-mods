@@ -387,7 +387,7 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
         if real:                                              # a REAL translation exists (the mod's own or another mod's): leave it
             res.covered += 1
             if len(res.skipped) < SKIP_LIST_MAX:
-                res.skipped.append({"text": text, "reason": "covered", "detail": real[-1][0]})
+                res.skipped.append({"text": text, "reason": "covered", "detail": real[-1][0], "translation": normalize(real[-1][1])})
             continue
         if found and text not in items:
             res.placeholders += 1                             # a translation file exists but only holds the original text: we translate it
@@ -402,7 +402,7 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
         if languages.same(lang, target):
             res.already_target += 1
             if len(res.skipped) < SKIP_LIST_MAX:
-                res.skipped.append({"text": text, "reason": "already_target", "detail": lang})
+                res.skipped.append({"text": text, "reason": "already_target", "detail": lang, "translation": text})
             continue
         groups.setdefault(lang, []).append(text)
     new_entries = {}

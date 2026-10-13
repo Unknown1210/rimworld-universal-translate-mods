@@ -14,6 +14,8 @@ namespace AutoTranslate
         public const string PackageId = "unknown1210.autotranslate";
         public static AtSettings Settings;
         static string helperCheckResult = "";
+        static float topHeight = 320f;        // height of the block above the mod list, measured while drawing (used on the next frame)
+        static Vector2 topScroll;
         static bool showAdvanced;
 
         public AutoTranslateMod(ModContentPack content) : base(content)
@@ -59,8 +61,17 @@ namespace AutoTranslate
                     Hotkey.Capture(Event.current);
                     Event.current.Use();
                 }
-                var l = new Listing_Standard();
-                l.Begin(inRect);
+                // The block above the mod list can be taller than the window (advanced options open, long error messages). It gets its own
+                // scroll view, capped at 55% of the window, and the list takes what is left. One column only: a Listing that runs out of
+                // height starts a second column, its height reads as tiny and the list used to be drawn on top of the first column.
+                float cap = inRect.height * 0.55f;
+                bool scrolls = topHeight > cap;
+                float shown = Math.Min(topHeight, cap);
+                var outRect = new Rect(inRect.x, inRect.y, inRect.width, shown);
+                var viewRect = new Rect(0f, 0f, inRect.width - (scrolls ? 18f : 0f), topHeight);
+                Widgets.BeginScrollView(outRect, ref topScroll, viewRect);
+                var l = new Listing_Standard { maxOneColumn = true };
+                l.Begin(new Rect(0f, 0f, viewRect.width, Math.Max(topHeight, 3000f)));
                 // 1) the live switch: compare with the original texts without leaving the game
                 bool off = Pipeline.Suspended;
                 l.Label(off ? "<color=#ffb347>" + T.Get("AT_Off") + "</color>" : "<color=#88dd88>" + T.Get("AT_On") + "</color>");
@@ -114,8 +125,10 @@ namespace AutoTranslate
                         Find.WindowStack.Add(Dialog_MessageBox.CreateConfirmation(T.Get("AT_ClearConfirm", Pipeline.Target == null ? "?" : LangNames.Label(Pipeline.Target)),
                             () => Safe.Run("settings", Pipeline.ClearCacheForTarget), true));
                 }
-                float top = l.CurHeight + 6f;
+                topHeight = Math.Max(60f, l.CurHeight + 6f);
                 l.End();
+                Widgets.EndScrollView();
+                float top = shown + 6f;
                 ModListUI.Draw(new Rect(inRect.x, inRect.y + top, inRect.width, Math.Max(90f, inRect.height - top)));
             }
             catch (Exception ex) { Safe.Report("settings", ex, "drawing settings window"); }

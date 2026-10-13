@@ -10,6 +10,7 @@ import queue
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 
@@ -81,8 +82,8 @@ class App:
         self.bulk_running = False
         self.rows = {}
         self.plan_rows = []
-        root.geometry("780x640")
-        root.minsize(620, 520)
+        root.geometry("880x640")
+        root.minsize(800, 520)
         root.protocol("WM_DELETE_WINDOW", self.quit)
 
         outer = ttk.Frame(root, padding=12)
@@ -124,9 +125,14 @@ class App:
         self.fields.append(f)
         return f
 
-    def stretch(self, frame, buttons):
+    def stretch(self, frame, buttons, uniform=True):
+        """Buttons side by side filling the row. uniform=False: each one is at least as wide as its text (no cut-off labels)
+        and the spare room is shared equally."""
         for i, b in enumerate(buttons):
-            frame.columnconfigure(i, weight=1, uniform="btn")
+            if uniform:
+                frame.columnconfigure(i, weight=1, uniform="btn")
+            else:
+                frame.columnconfigure(i, weight=1)
             b.grid(row=0, column=i, sticky="ew", padx=3)
 
     def build_home(self):
@@ -138,8 +144,13 @@ class App:
         content.grid(row=1, column=0, sticky="ew")
         content.columnconfigure(0, weight=1)
         self.content = content
-        self.lbl_keep = ttk.Label(content, font=("TkDefaultFont", 11, "bold"), anchor="center", justify="center")
-        self.lbl_keep.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        keep_box = ttk.Frame(content)
+        keep_box.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        keep_box.columnconfigure(0, weight=1)
+        self.lbl_keep = ttk.Label(keep_box, font=("TkDefaultFont", 11, "bold"), anchor="center", justify="center")
+        self.lbl_keep.grid(row=0, column=0, sticky="ew")
+        self.lbl_keep2 = ttk.Label(keep_box, foreground="#555555", anchor="center", justify="center")      # when it can be closed
+        self.lbl_keep2.grid(row=1, column=0, sticky="ew", pady=(2, 0))
         self.status = self.field(content, 1)
         self.status2 = self.field(content, 2, pady=(0, 8))
 
@@ -179,8 +190,7 @@ class App:
         self.dirs_frame = ttk.LabelFrame(b, padding=6)
         self.dirs_frame.grid(row=1, column=0, sticky="ew", pady=(0, 6))
         self.dirs_frame.columnconfigure(0, weight=1)
-        self.lbl_dirs = ttk.Label(self.dirs_frame, anchor="w", justify="left")
-        self.lbl_dirs.grid(row=0, column=0, sticky="ew")
+        self.dir_labels = []                    # [(path label, tag label or None)] of the rows drawn by render_dirs
         self.dir_rows = []
         btns = ttk.Frame(b)
         btns.grid(row=2, column=0, sticky="ew", pady=3)
@@ -190,7 +200,7 @@ class App:
         self.btn_bulk_all = ttk.Button(btns, command=lambda: self.start_bulk(True))
         self.btn_stop = ttk.Button(btns, command=self.stop_bulk, state="disabled")
         self.btn_clear = ttk.Button(btns, command=self.clear_translations)
-        self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop, self.btn_clear])
+        self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop, self.btn_clear], uniform=False)
         self.pbar = ttk.Progressbar(b, orient="horizontal", mode="determinate", maximum=100)
         self.pbar.grid(row=3, column=0, sticky="ew", pady=(8, 2))
         self.bulk_progress = self.field(b, 4, pady=(0, 0))
@@ -223,7 +233,9 @@ class App:
         for f in self.fields:
             f.label.configure(wraplength=wrap)
         self.lbl_keep.configure(wraplength=wrap)
-        self.lbl_dirs.configure(wraplength=wrap - 20)
+        self.lbl_keep2.configure(wraplength=wrap)
+        for path_lbl, _tag in self.dir_labels:
+            path_lbl.configure(wraplength=max(150, wrap - 140))
 
     # ------------------------------------------------------------------ language of the window
     def t(self, key, **kw):
@@ -237,6 +249,7 @@ class App:
         self.nb.tab(self.home, text=t("tab_home"))
         self.nb.tab(self.bulk_tab, text=t("tab_bulk"))
         self.lbl_keep.configure(text=t("keep_open"))
+        self.lbl_keep2.configure(text=t("keep_open2"))
         self.lbl_ui.configure(text=t("ui_lang"))
         self.lbl_target.configure(text=t("target_lang"))
         self.btn_model.configure(text=t("download_model"))
@@ -453,17 +466,31 @@ class App:
             self.dir_rows = bulk.dir_entries()
 
     def render_dirs(self):
-        """List of every folder searched, numbered, in the window language (called again when the language changes)."""
-        t = self.t
+        """List of every folder searched, numbered, in the window language (called again when the language changes).
+        The "[default]" tag sits at the right edge of its row; the tag of a folder the user added (or that is missing) follows the path."""
+        ttk, t = self.ttk, self.t
         self.dirs_frame.configure(text=t("bulk_dirs_title"))
+        for child in self.dirs_frame.winfo_children():
+            child.destroy()
+        self.dir_labels = []
+        self.dirs_frame.columnconfigure(0, weight=1)
         if not self.dir_rows:
-            self.lbl_dirs.configure(text=t("bulk_nodirs"))
+            ttk.Label(self.dirs_frame, text=t("bulk_nodirs"), anchor="w").grid(row=0, column=0, sticky="ew")
             return
-        lines = []
-        for i, (d, kind, exists) in enumerate(self.dir_rows, 1):
-            tag = t("dir_missing") if not exists else t("dir_default" if kind == "default" else "dir_added")
-            lines.append(f"{i}. {d}   [{tag}]")
-        self.lbl_dirs.configure(text="\n".join(lines))
+        for i, (d, kind, exists) in enumerate(self.dir_rows):
+            tag = "[" + t("dir_missing" if not exists else "dir_default" if kind == "default" else "dir_added") + "]"
+            right = exists and kind == "default"
+            path_lbl = ttk.Label(self.dirs_frame, anchor="w", justify="left", text=f"{i + 1}. {d}" + ("" if right else f"   {tag}"))
+            path_lbl.grid(row=i, column=0, sticky="ew")
+            tag_lbl = None
+            if right:
+                tag_lbl = ttk.Label(self.dirs_frame, anchor="e", text=tag)
+                tag_lbl.grid(row=i, column=1, sticky="e", padx=(8, 0))
+            self.dir_labels.append((path_lbl, tag_lbl))
+
+    def dirs_text(self):
+        """The folder list as plain text (what is on screen), one line per folder; used by the tests."""
+        return "\n".join(p.cget("text") + (("   " + t.cget("text")) if t is not None else "") for p, t in self.dir_labels)
 
     def add_dir(self):
         from tkinter import filedialog
@@ -537,6 +564,10 @@ class App:
             self.bulk_progress.set_key("bulk_all_ok")
             self.pbar["value"] = 100
 
+    def _with_folder(self, vals):
+        """The five data cells plus the "open folder" cell of the last column."""
+        return tuple(vals) + (self.t("folder_open"),)
+
     def _row_values(self, mod, status, saved, running=False):
         t = self.t
         if running:
@@ -596,11 +627,45 @@ class App:
         if self.cancel is not None:
             self.cancel.set()
 
+    @staticmethod
+    def format_eta(seconds):
+        """'45 s', '3 min 20 s', '1 h 05 min' (the same in every language)."""
+        sec = max(0, int(round(seconds)))
+        if sec < 60:
+            return f"{max(5, sec // 5 * 5) if sec else 0} s"
+        if sec < 3600:
+            return f"{sec // 60} min {sec % 60 // 5 * 5:02d} s"
+        return f"{sec // 3600} h {sec % 3600 // 60:02d} min"
+
+    def eta_text(self, frac):
+        """Estimated time left from the time spent so far; '' while there is too little progress to tell."""
+        t0 = getattr(self, "_bulk_t0", None)
+        if t0 is None or frac < 0.02 or frac >= 1:
+            return ""
+        spent = time.time() - t0
+        if spent < 8:
+            return ""
+        return self.format_eta(spent * (1 - frac) / frac)
+
+    def show_progress(self, done_mods, total, cur_done=0, cur_total=0):
+        """Progress bar and "X of N mods (P%)" line, with the estimated time left once there is enough to go on.
+        The mod being translated counts for the part of its texts already done."""
+        total = max(1, total)
+        frac = min(1.0, (done_mods + (cur_done / cur_total if cur_total else 0)) / total)
+        self.pbar["value"] = int(frac * 100)
+        eta = self.eta_text(frac)
+        if eta:
+            self.bulk_progress.set_key("bulk_progress_eta", done=done_mods, total=total, pct=int(frac * 100), eta=eta)
+        else:
+            self.bulk_progress.set_key("bulk_progress", done=done_mods, total=total, pct=int(frac * 100))
+
     def on_bulk_event(self, e):
         ev = e.get("event")
         if ev == "start":
             self._total = e["total"]
             self._words = 0
+            self._done_mods = 0
+            self._bulk_t0 = time.time()
             self.bulk_progress.set_key("bulk_progress", done=0, total=e["total"], pct=0)
         elif ev == "model":
             self.bulk_current.set_key("bulk_model", pair=e["pair"])
@@ -608,24 +673,23 @@ class App:
             self.bulk_current.set_key("bulk_current", name=e["name"], done=0, total=0)
             for pid, (m, s, r) in ((m.package_id, row) for row in self.plan_rows for m in [row[0]]):
                 if m.name == e["name"] and pid in self.rows:
-                    self.tree.item(self.rows[pid], values=self._row_values(m, s, r, running=True))
+                    self.tree.item(self.rows[pid], values=self._with_folder(self._row_values(m, s, r, running=True)))
                     self.tree.see(self.rows[pid])
         elif ev == "mod_progress":
             self.bulk_current.set_key("bulk_current", name=e["name"], done=e["done"], total=e["total"])
+            self.show_progress(getattr(self, "_done_mods", 0), getattr(self, "_total", 1), e["done"], e["total"])
         elif ev == "mod_done":
             r = e["result"]
             self._words += r.words
-            total = max(1, e["total"])
-            pct = int(e["index"] * 100 / total)
-            self.pbar["value"] = pct
-            self.bulk_progress.set_key("bulk_progress", done=e["index"], total=e["total"], pct=pct)
+            self._done_mods = e["index"]
+            self.show_progress(e["index"], e["total"])
             for m, s, _old in self.plan_rows:
                 if m.package_id == r.package_id and m.package_id in self.rows:
                     saved = None if r.error else r.to_state(m.fingerprint)
                     vals = self._row_values(m, "ok", saved)
                     if r.error:
                         vals = (m.name, "", 0, 0, self.t("st_error"))
-                    self.tree.item(self.rows[m.package_id], values=vals)
+                    self.tree.item(self.rows[m.package_id], values=self._with_folder(vals))
 
     def _bulk_done(self, results, err):
         self.bulk_running = False
@@ -757,10 +821,19 @@ class App:
         done = sorted(cache.items(), key=lambda kv: kv[0].lower())
         tv1 = make_tab(t("det_tab_translated", n=len(done)), [("o", t("det_col_orig")), ("t", t("det_col_trans"))],
                        [((k, v), (k, v)) for k, v in done])
+        # words: the same translated texts, each with its number of words (what the "Words" column of the main table adds up), most words first
+        counted = sorted(((bulk.count_words(k), k, v) for k, v in done), key=lambda x: (-x[0], x[1].lower()))
+        tv3 = make_tab(t("det_tab_words", n=sum(c for c, _k, _v in counted)),
+                       [("o", t("det_col_orig")), ("t", t("det_col_trans")), ("w", t("det_col_words"))],
+                       [((k, v, str(c)), (k, v)) for c, k, v in counted])
+        tv3.column("w", width=90, minwidth=70, stretch=False, anchor="center")
+        tv3.heading("w", anchor="center")
         reasons = {"covered": lambda d: t("r_covered", provider=d), "already_target": lambda d: t("r_already"),
                    "unsupported": lambda d: t("r_unsupported", pair=d), "failed": lambda d: t("r_failed")}
-        tv2 = make_tab(t("det_tab_skipped", n=len(skipped)), [("o", t("det_col_orig")), ("r", t("det_col_reason"))],
-                       [((x["text"], reasons.get(x["reason"], lambda d: x["reason"])(x.get("detail", ""))), (x["text"], "")) for x in skipped])
+        # not translated by us: the text, how it reads now (the translation that already exists, if any) and why it was left alone
+        tv2 = make_tab(t("det_tab_skipped", n=len(skipped)), [("o", t("det_col_orig")), ("e", t("det_col_existing")), ("r", t("det_col_reason"))],
+                       [((x["text"], x.get("translation", ""), reasons.get(x["reason"], lambda d: x["reason"])(x.get("detail", ""))),
+                         (x["text"], x.get("translation", ""))) for x in skipped])
         # the selected row in full: descriptions are long
         box = ttk.Frame(top)
         box.grid(row=2, column=0, sticky="ew", padx=8, pady=6)
@@ -782,12 +855,13 @@ class App:
                 show_full(event.widget, sel[0])
         tv1.bind("<<TreeviewSelect>>", on_select)
         tv2.bind("<<TreeviewSelect>>", on_select)
+        tv3.bind("<<TreeviewSelect>>", on_select)
         if not done and not skipped:
             txt.configure(state="normal")
             txt.insert("end", t("det_empty"))
             txt.configure(state="disabled")
         ttk.Button(top, text=t("det_close"), command=top.destroy).grid(row=3, column=0, pady=(0, 8))
-        top.details = {"translated": tv1, "skipped": tv2, "text": txt, "full": full, "nb": nb, "tabs": [tv1, tv2]}
+        top.details = {"translated": tv1, "words": tv3, "skipped": tv2, "text": txt, "full": full, "nb": nb, "tabs": [tv1, tv3, tv2]}
         if keep_sel:                                           # same tab and same row as before the redraw
             try:
                 nb.select(keep_sel[0])

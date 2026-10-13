@@ -48,6 +48,7 @@ namespace HarmonyLib
 
 namespace RimWorld
 {
+    public class Designator_Build : Verse.Designator { }
     public static class MessageTypeDefOf { public static Verse.MessageTypeDef SilentInput = new Verse.MessageTypeDef(); }
     public static class VersionControl { public static string CurrentVersionString { get { return "1.6"; } } }
 }
@@ -90,8 +91,14 @@ namespace Verse
         public static void Look<T>(ref T value, string label, T defaultValue = default(T)) { }
     }
     public abstract class ModSettings { public abstract void ExposeData(); }
+    public class ModAssemblyHandler { public List<System.Reflection.Assembly> loadedAssemblies = new List<System.Reflection.Assembly>(); }
+    public abstract class Command { public string defaultLabel, defaultDesc; }
+    public abstract class Designator : Command { }
+    public class DesignationCategoryDef : Def { public List<Designator> designators = new List<Designator>(); public List<Designator> AllResolvedDesignators { get { return designators; } } }
+    public static class DefDatabase<T> where T : Def { public static List<T> list = new List<T>(); public static List<T> AllDefsListForReading { get { return list; } } }
     public class ModContentPack
     {
+        public ModAssemblyHandler assemblies = new ModAssemblyHandler();
         public string RootDir, Name, PackageIdPlayerFacing;
         public bool IsCoreMod, IsOfficialMod;
         public List<string> foldersToLoadDescendingOrder;
@@ -144,6 +151,7 @@ namespace Verse
     public class FloatMenu : Window { public FloatMenu(List<FloatMenuOption> opts) { } }
     public class Listing_Standard
     {
+        public bool maxOneColumn;
         public float CurHeight { get { return 0f; } }
         public void Gap(float h) { }
         public void Begin(UnityEngine.Rect r) { }

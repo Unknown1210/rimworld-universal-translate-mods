@@ -130,14 +130,14 @@ class Window(unittest.TestCase):
 
     def test_layout_is_responsive(self):
         app = self.build(fake_fetcher(release_json("v0.0")))
-        self.root.geometry("460x360")
+        self.root.geometry("820x500")
         pump(self.root, lambda: False, timeout=0.3)
         small = int(str(app.update_msg.label.cget("wraplength")))
         small_btn = app.btn_check.winfo_width()
-        self.root.geometry("900x500")
+        self.root.geometry("1300x500")
         pump(self.root, lambda: False, timeout=0.5)
         big = int(str(app.update_msg.label.cget("wraplength")))
-        self.assertGreater(big, small + 200, "text re-wraps to the new width")
+        self.assertGreater(big, small + 300, "text re-wraps to the new width")
         self.assertGreater(app.btn_check.winfo_width(), small_btn + 100, "buttons stretch with the window")
 
     def test_language_picker_shows_full_names_in_the_window_language(self):
@@ -236,11 +236,23 @@ class BulkTab(unittest.TestCase):
         try:
             app = gui.App(r, httpd, fetcher=fake_fetcher(release_json("v0.0")), lang="pt", mod_dirs=[root])
             # 0) the folders that are searched are listed (numbered, with what kind each one is) before the progress bar
-            self.assertTrue(pump(r, lambda: str(app.lbl_dirs.cget("text")).startswith("1. ")), "folder list is shown")
-            shown = str(app.lbl_dirs.cget("text"))
+            self.assertTrue(pump(r, lambda: app.dirs_text().startswith("1. ")), "folder list is shown")
+            shown = app.dirs_text()
             self.assertIn(str(root), shown)
             self.assertIn("adicionada por você", shown)
             self.assertIn("Pastas pesquisadas", str(app.dirs_frame.cget("text")))
+            # the "[padrão]" tag is a separate label stuck to the right edge; the tag of an added folder stays after its path
+            self.assertTrue(all(tg is None for _p, tg in app.dir_labels), "only default folders get the right-hand tag (none here: the test folder is an added one)")
+            self.assertIn("[adicionada por você]", app.dir_labels[0][0].cget("text"))
+            from rwtranslate import gui as _gui
+            app.dir_rows = [(Path("C:/Steam/RimWorld/Mods"), "default", True)] + list(app.dir_rows)
+            app.render_dirs()
+            p0, t0 = app.dir_labels[0]
+            self.assertEqual(str(t0.cget("text")), "[padrão]")
+            self.assertEqual(str(t0.grid_info()["sticky"]), "e", "the default tag is aligned to the right")
+            self.assertNotIn("[padrão]", p0.cget("text"))
+            app.dir_rows = app.dir_rows[1:]
+            app.render_dirs()
             # 1) search: two NEW mods listed, button offers to translate them
             self.assertTrue(pump(r, lambda: len(app.plan_rows) == 2), "scan lists the mods")
             self.assertEqual(sorted(s for _m, s, _r in app.plan_rows), ["new", "new"])
@@ -264,6 +276,24 @@ class BulkTab(unittest.TestCase):
             self.assertTrue(pump(r, lambda: len(app.plan_rows) == 3 and not app.bulk_running), "rescan sees the new mod")
             self.assertEqual(sorted(s for _m, s, _r in app.plan_rows), ["new", "ok", "ok"])
             self.assertIn("Traduzir pendentes (1)", str(app.btn_bulk.cget("text")))
+            # 3-pre) at the default window size no button label is cut off, and the window is wide enough
+            app.nb.select(app.bulk_tab)
+            r.update()
+            for b in (app.btn_add_dir, app.btn_scan, app.btn_bulk, app.btn_bulk_all, app.btn_stop, app.btn_clear):
+                self.assertGreaterEqual(b.winfo_width(), b.winfo_reqwidth(), f"button '{b.cget('text')}' is cut off")
+            # the progress line gets an estimated time left once enough has been done
+            self.assertEqual(app.format_eta(45), "45 s")
+            self.assertEqual(app.format_eta(200), "3 min 20 s")
+            self.assertEqual(app.format_eta(3900), "1 h 05 min")
+            app._bulk_t0 = None
+            self.assertEqual(app.eta_text(0.5), "", "no estimate before the run started")
+            app._bulk_t0 = time.time() - 60
+            self.assertEqual(app.eta_text(0.5), "1 min 00 s", "half done in a minute: about a minute left")
+            self.assertEqual(app.eta_text(0.001), "", "too little progress to estimate")
+            app.show_progress(1, 4, 2, 4)                       # 1 mod done + half of the second = 37%
+            self.assertIn("37%", app.bulk_progress.get())
+            self.assertIn("tempo restante estimado", app.bulk_progress.get())
+            app._bulk_t0 = None
             # 3a) columns: names centred except the mod; the last column opens the mod's folder
             for col in ("source", "texts", "words", "state", "folder"):
                 self.assertEqual(str(app.tree.column(col, "anchor")), "center", col)
@@ -295,6 +325,15 @@ class BulkTab(unittest.TestCase):
             rows = [tv.item(i, "values") for i in tv.get_children()]
             self.assertEqual({str(v[0]): str(v[1]) for v in rows}["iron sword"], "iron sword (pt)")
             self.assertEqual(len(rows), 2)
+            # words tab: the same texts with their number of words, most words first; total in the tab title
+            nbk = top.details["nb"]
+            self.assertEqual(nbk.tab(1, "text"), "Palavras traduzidas (7)")
+            wrows = [top.details["words"].item(i, "values") for i in top.details["words"].get_children()]
+            self.assertEqual([(str(v[0]), str(v[2])) for v in wrows], [("A sharp sword for fighting.", "5"), ("iron sword", "2")])
+            self.assertEqual(top.details["words"].heading("w")["text"], "Palavras")
+            # not-translated tab: Original | Tradução existente | Motivo
+            self.assertEqual(len(top.details["skipped"]["columns"]), 3)
+            self.assertEqual([top.details["skipped"].heading(c)["text"] for c in top.details["skipped"]["columns"]], ["Original", "Tradução existente", "Motivo"])
             tv.selection_set(tv.get_children()[0])
             tv.event_generate("<<TreeviewSelect>>")
             r.update()
@@ -304,11 +343,13 @@ class BulkTab(unittest.TestCase):
             app.set_lang("en")
             self.assertEqual(top.title(), "Details: Alpha Mod")
             self.assertEqual(top.details["nb"].tab(0, "text"), "Translated (2)")
+            self.assertEqual(top.details["nb"].tab(1, "text"), "Words translated (7)")
+            self.assertEqual(top.details["skipped"].heading("e")["text"], "Existing translation")
             self.assertEqual(top.details["translated"].heading("o")["text"], "Original")
             self.assertEqual(top.details["translated"].heading("t")["text"], "Translation")
             self.assertIn("Translation:", top.details["text"].get("1.0", "end"), "the selected row stays selected, text in English")
             self.assertNotIn("Tradução:", top.details["text"].get("1.0", "end"))
-            self.assertIn("added by you", str(app.lbl_dirs.cget("text")))
+            self.assertIn("added by you", app.dirs_text())
             self.assertIn("Folders searched", str(app.dirs_frame.cget("text")))
             app.set_lang("pt")
             self.assertEqual(top.title(), "Detalhes: Alpha Mod")

@@ -89,6 +89,12 @@ class Bulk(unittest.TestCase):
     def setUp(self):
         CALLS.clear()
 
+    def test_skipped_list_shows_the_existing_translation(self):
+        res = {r.package_id: r for r in bulk.run("pt", self.dirs, force=True)}
+        covered = [x for x in res["d.partial"].skipped if x["reason"] == "covered"]
+        self.assertEqual([(x["text"], x["translation"]) for x in covered], [("covered item", "Item coberto")],
+                         "a text left alone because it already has a translation shows that translation")
+
     def test_clear_translations_keeps_overrides(self):
         from rwtranslate.paths import data_dir
         bulk.write_cache("zz", "m.one", {"a": "b"})

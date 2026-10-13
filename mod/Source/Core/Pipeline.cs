@@ -115,6 +115,7 @@ namespace AutoTranslate
                 // a harvest crash for one mod must not affect others: HarvestDefs reports per mod itself
             }
             if (s.translateKeyed) Safe.Run("harvest-keyed", HarvestKeyed);
+            if (s.translateKeyed) Safe.Run("harvest-designators", HarvestDesignators);
             Safe.Run("language-detect", AssignLanguages);
 
             ApplyInitial();
@@ -528,6 +529,56 @@ namespace AutoTranslate
             AtLog.Info("harvest-keyed", "examined " + seen + " keyed entries; " + official + " official, " + noOwner + " with no identifiable mod owner");
         }
 
+        /// <summary>The buttons of the Orders / Architect tabs that a mod builds in code (Search and rescue, Rearm traps...) are Designator objects created while the
+        /// game loads, BEFORE this mod runs: they already hold their text in a plain field (defaultLabel / defaultDesc), so changing the Keyed dictionary later does
+        /// not reach them. Here the fields themselves are translated. A designator belongs to the mod whose assembly its class lives in; building buttons made from
+        /// a def (Designator_Build) are covered by the def translation, and official or unknown classes are left alone.</summary>
+        static void HarvestDesignators()
+        {
+            var byAsm = new Dictionary<Assembly, ModState>();
+            foreach (ModContentPack m in LoadedModManager.RunningModsListForReading)
+            {
+                ModState owner = StateOf(m);
+                if (owner == null || m.assemblies == null || m.assemblies.loadedAssemblies == null) continue;
+                foreach (Assembly a in m.assemblies.loadedAssemblies) byAsm[a] = owner;
+            }
+            if (byAsm.Count == 0) return;
+            int n = 0;
+            foreach (DesignationCategoryDef cat in DefDatabase<DesignationCategoryDef>.AllDefsListForReading)
+            {
+                List<Designator> all = cat.AllResolvedDesignators;
+                if (all == null) continue;
+                foreach (Designator des in all)
+                {
+                    if (des == null || des is RimWorld.Designator_Build) continue;
+                    ModState ms;
+                    if (!byAsm.TryGetValue(des.GetType().Assembly, out ms) || !ms.Active) continue;
+                    Designator d = des;
+                    try
+                    {
+                        string name = d.GetType().Name;
+                        if (QueueCommandText(ms, name + ".defaultLabel", d.defaultLabel, t => d.defaultLabel = t)) n++;
+                        if (QueueCommandText(ms, name + ".defaultDesc", d.defaultDesc, t => d.defaultDesc = t)) n++;
+                    }
+                    catch (Exception e) { ms.Fail("harvest", "designator " + d.GetType().Name, e); }
+                }
+            }
+            AtLog.Info("harvest-designators", "queued " + n + " button text(s) built in code by mods");
+        }
+
+        static bool QueueCommandText(ModState ms, string origin, string cur, Action<string> set)
+        {
+            if (string.IsNullOrWhiteSpace(cur)) return false;
+            string sl = LangDetect.ScriptLang(cur);
+            if (sl != null && LangMap.Same(sl, Target)) return false;                       // already in the target language
+            bool conf; string det;
+            if (sl == null && LangDetect.LatinLang(new[] { cur }, out conf, out det) == Target && conf) return false;
+            string orig = cur;
+            var b = new Binding { Apply = set, Revert = () => set(orig) };
+            Decide(ms, null, () => orig, origin, b);
+            return true;
+        }
+
         static void SetKeyed(IDictionary active, string key, object original, FieldInfo valueField, string translated, bool sameDict)
         {
             if (sameDict) { valueField.SetValue(original, translated); return; }
@@ -656,6 +707,23 @@ namespace AutoTranslate
         public static int TargetPollMs = 3000;      // tests lower this
         static int lastPoll;
 
+        static string extSig = "";
+
+        /// <summary>The translator program can write new translations (its "Translate mods" tab) while the game is open. When the cache files change
+        /// outside the game and stay unchanged for one more check (the program may still be writing), reload so the new translations show up now
+        /// instead of after a restart.</summary>
+        static void PollCache()
+        {
+            var s = AutoTranslateMod.Settings;
+            if (cache == null || Target == null || s == null || !s.enabled || !WorkerFinished) return;
+            string sig = cache.ExternalSignature();
+            if (sig.Length == 0) { extSig = ""; return; }
+            if (sig != extSig) { extSig = sig; return; }
+            extSig = "";
+            AtLog.Info("pipeline", "translation files changed outside the game (the translator program); reloading to apply them");
+            Reload();
+        }
+
         /// <summary>The player may change the target language in the translator program while the game runs: notice it and reload.</summary>
         static void PollTarget()
         {
@@ -673,7 +741,7 @@ namespace AutoTranslate
         public static void Tick()
         {
             int now = Environment.TickCount;
-            if (unchecked(now - lastPoll) >= TargetPollMs) { lastPoll = now; Safe.Run("poll", PollTarget); }
+            if (unchecked(now - lastPoll) >= TargetPollMs) { lastPoll = now; Safe.Run("poll", PollTarget); Safe.Run("poll-cache", PollCache); }
             if (disabledQueue.IsEmpty && results.IsEmpty) return;
             try
             {
