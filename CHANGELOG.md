@@ -4,6 +4,14 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.008 - 2026-10-13
+- Corrigido: "Atualizar agora" falhava com "[Errno 22] Invalid argument" no arquivo `RimWorldAutoTranslate.dll` quando o RimWorld estava aberto: o Windows não deixa gravar por cima de uma DLL que o jogo carregou. Agora a DLL antiga é posta de lado (`.old`, que o jogo ignora) e a nova é gravada; o jogo usa a nova na próxima abertura. O `.old` é apagado na próxima atualização. Se mesmo assim não der para gravar algum arquivo do mod, a mensagem diz para fechar o RimWorld.
+- Corrigido: quando o mod não podia ser atualizado, a janela mostrava "A atualização falhou" e NÃO reiniciava, embora o executável novo já estivesse no lugar (parecia que nada tinha sido baixado). Agora o executável novo abre e o antigo fecha mesmo assim, e a mensagem diz que só o mod ficou sem atualizar (com mais tempo para ler antes de reiniciar).
+- Corrigido: um segundo clique em "Atualizar agora" depois de uma atualização que não reiniciou falhava com "[WinError 5] Acesso negado" no arquivo `.exe.old` (o programa antigo ainda rodava a partir dele e o Windows não deixa apagar um arquivo em uso). Agora, se o executável do disco já é a versão nova, ele só abre a nova sem baixar nem trocar nada; e um `.old` que não dá para apagar não impede mais a troca (o arquivo é guardado com outro nome, e os `.old` antigos são apagados quando o programa abre).
+- Alterado: no README, a divisória entre os itens das listas agora vai até o fim da frase (linha de traço mais longa, ainda simples e sem espaço grande).
+- Adicionado: testes do atualizador: DLL do mod em uso, mensagem clara quando não dá para gravar, segundo clique depois de uma atualização, `.old` que não pode ser apagado, e a janela reiniciando mesmo com problema no mod (76 testes no auxiliar).
+- Não validado ainda: a atualização no Windows de verdade com o RimWorld aberto (a troca de uma DLL em uso foi simulada nos testes; no Windows o comportamento é o descrito pela documentação do sistema); a largura da divisória do README em telas estreitas (em uma tela estreita ela pode quebrar em duas linhas).
+
 ## v0.007 - 2026-10-13
 - Alterado: no README, a linha divisória passa a separar TODOS os itens de TODAS as listas (numeradas e com marcadores), e não só os de "Como funciona", "Instalação" e "Aviso do Windows": 10 listas, 32 divisórias. A divisória ficou curta e simples (uma linha curta de traço no fim de cada item, sem o espaço grande da linha larga de antes). As listas numeradas voltam a seguir na sequência normal (1, 2, 3...).
 - Não validado ainda: como o GitHub mostra as divisórias curtas (conferido só em um conversor local de Markdown).

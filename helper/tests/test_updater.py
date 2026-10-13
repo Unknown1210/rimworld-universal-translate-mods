@@ -142,6 +142,40 @@ class Apply(unittest.TestCase):
             updater.update_helper(rel, fake_fetcher(release_json()))   # not frozen, no exe_path
         self.assertIn("pip", str(cm.exception))
 
+    def test_second_click_after_an_update_that_did_not_restart(self):
+        """First click swapped the exe but the old window kept running from name.old (Windows cannot delete a running file).
+        The second click must not fail with 'Access denied' on that .old: it sees the new exe is already in place."""
+        from unittest import mock
+        d = Path(tempfile.mkdtemp())
+        exe = d / "UniversalTranslate-Helper.exe"
+        exe.write_bytes(b"OLD")
+        rel = updater.latest_release(fake_fetcher(release_json()))
+        updater.update_helper(rel, fake_fetcher(release_json()), exe_path=exe)
+        self.assertEqual(exe.read_bytes(), NEW_EXE)
+        running_old = d / "UniversalTranslate-Helper.exe.old"
+        self.assertEqual(running_old.read_bytes(), b"OLD")
+        got = updater.update_helper(rel, fake_fetcher(release_json()), exe_path=exe)       # same version already installed
+        self.assertEqual(got, exe)
+        self.assertEqual(exe.read_bytes(), NEW_EXE)
+
+    def test_old_file_that_cannot_be_deleted_does_not_block_a_later_swap(self):
+        from unittest import mock
+        d = Path(tempfile.mkdtemp())
+        exe = d / "UniversalTranslate-Helper.exe"
+        exe.write_bytes(b"V1")
+        (d / "UniversalTranslate-Helper.exe.old").write_bytes(b"RUNNING")             # a running old program: deleting it is refused
+        real_unlink = Path.unlink
+
+        def refuse(self, *a, **k):
+            if self.name.endswith(".exe.old"):
+                raise PermissionError(5, "Access denied")
+            return real_unlink(self, *a, **k)
+        with mock.patch.object(Path, "unlink", refuse):
+            updater._swap(exe, b"V2")
+        self.assertEqual(exe.read_bytes(), b"V2")
+        self.assertEqual((d / "UniversalTranslate-Helper.exe.old").read_bytes(), b"RUNNING", "the running copy is left alone")
+        self.assertEqual((d / "UniversalTranslate-Helper.exe.old1").read_bytes(), b"V1", "the replaced one is set aside under a new name")
+
     def test_mod_extracted_over_installation(self):
         d = Path(tempfile.mkdtemp()) / "AutoTranslate"
         (d / "1.6/Assemblies").mkdir(parents=True)
@@ -151,6 +185,37 @@ class Apply(unittest.TestCase):
         self.assertEqual(n, 2)
         self.assertEqual((d / "1.6/Assemblies/RimWorldAutoTranslate.dll").read_bytes(), b"DLL-NEW")
         self.assertTrue(updater._is_our_mod(d))
+
+    def test_mod_dll_loaded_by_the_running_game_is_set_aside_not_overwritten(self):
+        """Windows refuses to overwrite a DLL the game has loaded ([Errno 22]) but allows renaming it: the old one goes to .old."""
+        from unittest import mock
+        d = Path(tempfile.mkdtemp()) / "AutoTranslate"
+        dll = d / "1.6/Assemblies/RimWorldAutoTranslate.dll"
+        dll.parent.mkdir(parents=True)
+        dll.write_bytes(b"DLL-OLD")
+        real = Path.write_bytes
+
+        def locked(self, data):
+            if self.name == "RimWorldAutoTranslate.dll" and self.exists():
+                raise OSError(22, "Invalid argument")
+            return real(self, data)
+        f = fake_fetcher(release_json())
+        with mock.patch.object(Path, "write_bytes", locked):
+            n = updater.update_mod(updater.latest_release(f), d, f)
+        self.assertEqual(n, 2)
+        self.assertEqual(dll.read_bytes(), b"DLL-NEW")
+        self.assertEqual(dll.with_name(dll.name + ".old").read_bytes(), b"DLL-OLD", "the loaded copy is kept aside")
+        updater.update_mod(updater.latest_release(f), d, f)        # next update: the leftover .old is cleaned up
+        self.assertFalse(any(d.rglob("*.old")))
+
+    def test_mod_file_that_cannot_be_written_gives_a_clear_message(self):
+        from unittest import mock
+        d = Path(tempfile.mkdtemp()) / "AutoTranslate"
+        f = fake_fetcher(release_json())
+        with mock.patch.object(Path, "write_bytes", side_effect=OSError(22, "Invalid argument")):
+            with self.assertRaises(updater.UpdateError) as cm:
+                updater.update_mod(updater.latest_release(f), d, f)
+        self.assertIn("RimWorld", str(cm.exception))
 
     def test_mod_zip_with_unsafe_paths_rejected(self):
         for evil in ("AutoTranslate/../../escape.txt", "Other/x.txt", "/abs.txt"):

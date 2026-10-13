@@ -194,14 +194,27 @@ def download_verified(rel, name, fetcher=fetch, progress=None):
 
 # ---------------------------------------------------------------- helper (the exe)
 
+def _old_name(current: Path) -> Path:
+    """Where the program being replaced is set aside: name.old, or a numbered name when a previous .old cannot be deleted
+    (it is still RUNNING: after an update that did not restart, the old program keeps running from that file)."""
+    old = current.with_name(current.name + ".old")
+    n = 0
+    while old.exists():
+        try:
+            old.unlink()
+            break
+        except OSError:
+            n += 1
+            old = current.with_name(f"{current.name}.old{n}")
+    return old
+
+
 def _swap(current: Path, new_bytes: bytes):
     """Replace `current` by new_bytes. Windows lets a running exe be renamed but not overwritten."""
     new = current.with_name(current.name + ".new")
-    old = current.with_name(current.name + ".old")
+    old = _old_name(current)
     new.write_bytes(new_bytes)
     try:
-        if old.exists():
-            old.unlink()
         os.replace(current, old)
         try:
             os.replace(new, current)
@@ -214,10 +227,19 @@ def _swap(current: Path, new_bytes: bytes):
 
 
 def update_helper(rel, fetcher=fetch, progress=None, exe_path=None):
-    """Returns the path of the updated exe. Only meaningful for the packaged exe (or an explicit exe_path)."""
+    """Returns the path of the updated exe. Only meaningful for the packaged exe (or an explicit exe_path).
+    If the file on disk already IS the new version (an earlier click installed it but the old window kept running), nothing is
+    downloaded or swapped: the caller just starts it."""
     target = Path(exe_path) if exe_path else (Path(sys.executable) if is_frozen() else None)
     if target is None:
         raise UpdateError("Você está usando a versão Python: atualize com `pip install --upgrade` a partir do ZIP novo do GitHub.")
+    expected = rel.hashes.get(HELPER_ASSET)
+    try:
+        if expected and target.is_file() and hashlib.sha256(target.read_bytes()).hexdigest() == expected:
+            log.info("the program on disk is already %s; only restarting into it", rel.tag)
+            return target
+    except OSError:
+        pass
     data = download_verified(rel, HELPER_ASSET, fetcher, progress)
     _swap(target, data)
     log.info("helper updated to %s at %s", rel.tag, target)
@@ -228,12 +250,12 @@ def cleanup_old():
     """Delete the previous exe left by an update (it could not be removed while running)."""
     if not is_frozen():
         return
-    old = Path(sys.executable).with_name(Path(sys.executable).name + ".old")
-    try:
-        if old.exists():
+    exe = Path(sys.executable)
+    for old in exe.parent.glob(exe.name + ".old*"):         # .old, .old1, ... (one may still be running: it stays until next time)
+        try:
             old.unlink()
-    except OSError:
-        pass
+        except OSError:
+            pass
 
 
 def restart(exe=None, args=None):
@@ -298,11 +320,41 @@ def save_mod_dir(path):
     config.set("mod_dir", str(path))
 
 
+def _write_replacing(dest: Path, data: bytes):
+    """Write a file of the mod. A DLL that the running game has loaded cannot be overwritten on Windows (the error shows up as
+    [Errno 22] "Invalid argument"), but it CAN be renamed: move the old one aside (name.old, ignored by the game) and write the new one.
+    The game keeps using the old copy until it is restarted; the next start loads the new one."""
+    try:
+        dest.write_bytes(data)
+        return
+    except OSError as first:
+        old = dest.with_name(dest.name + ".old")
+        try:
+            if old.exists():
+                old.unlink()
+            os.replace(dest, old)
+        except OSError:
+            raise first
+        try:
+            dest.write_bytes(data)
+        except OSError:
+            try:
+                os.replace(old, dest)          # never leave the mod without that file
+            except OSError:
+                pass
+            raise
+
+
 def update_mod(rel, mod_dir, fetcher=fetch, progress=None):
     """Extract the AutoTranslate/ folder of the release zip over the installed mod. Returns number of files written."""
     import io
     data = download_verified(rel, MOD_ASSET, fetcher, progress)
     mod_dir = Path(mod_dir)
+    for stale in mod_dir.rglob("*.old"):           # copies set aside by an earlier update (they could not be deleted while the game used them)
+        try:
+            stale.unlink()
+        except OSError:
+            pass
     written = 0
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         names = [n for n in z.namelist() if not n.endswith("/")]
@@ -315,9 +367,9 @@ def update_mod(rel, mod_dir, fetcher=fetch, progress=None):
             dest = mod_dir / rel_path
             dest.parent.mkdir(parents=True, exist_ok=True)
             try:
-                dest.write_bytes(z.read(n))
-            except PermissionError:
-                raise UpdateError(f"Não consegui gravar {dest}. Feche o RimWorld e tente de novo.")
+                _write_replacing(dest, z.read(n))
+            except OSError as e:
+                raise UpdateError(f"Não consegui gravar {dest} ({e.strerror or e}). Se o RimWorld estiver aberto, feche-o e atualize de novo.")
             written += 1
     log.info("mod updated to %s in %s (%d files)", rel.tag, mod_dir, written)
     return written

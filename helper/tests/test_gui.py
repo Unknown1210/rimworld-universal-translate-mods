@@ -76,6 +76,28 @@ class Window(unittest.TestCase):
         self.assertEqual((mod / "1.6/Assemblies/RimWorldAutoTranslate.dll").read_bytes(), b"DLL-NEW")
         self.assertEqual(restarted[0], exe)
 
+    def test_mod_problem_still_updates_and_restarts_the_program(self):
+        """The mod folder cannot be written (the game is open): the new exe is already in place, so the program still restarts into it
+        and the message says what is left (this used to show 'update failed' and leave the old program running)."""
+        from unittest import mock
+        from rwtranslate import updater
+        d = Path(tempfile.mkdtemp())
+        exe = d / "UniversalTranslate-Helper.exe"
+        exe.write_bytes(b"OLD")
+        mod = d / "AutoTranslate"
+        mod.mkdir()
+        restarted = []
+        app = self.build(fake_fetcher(release_json("v9.0")), exe_path=exe, mod_dir=mod, restart=lambda e: restarted.append(e))
+        app.RESTART_MS_MOD_PROBLEM = 100
+        self.assertTrue(pump(self.root, lambda: "Nova versão disponível: v9.0" in app.update_msg.get()), app.update_msg.get())
+        with mock.patch.object(updater, "update_mod", side_effect=OSError(22, "Invalid argument")):
+            app.btn_apply.invoke()
+            self.assertTrue(pump(self.root, lambda: bool(restarted)), app.update_msg.get() + " | " + app.progress.get())
+        self.assertEqual(exe.read_bytes(), NEW_EXE, "the program itself was updated")
+        self.assertEqual(restarted[0], exe, "and the new one is opened")
+        self.assertIn("Mod NÃO atualizado", app.update_msg.get())
+        self.assertNotIn("falhou", app.update_msg.get())
+
     def test_up_to_date_message_and_button(self):
         app = self.build(fake_fetcher(release_json("v0.0")))
         self.assertTrue(pump(self.root, lambda: "já está na versão mais nova" in app.update_msg.get()), app.update_msg.get())

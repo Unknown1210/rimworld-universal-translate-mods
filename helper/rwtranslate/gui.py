@@ -64,6 +64,8 @@ class Field:
 
 
 class App:
+    RESTART_MS = 1200               # after a good update: time to read the message, then the new program opens
+    RESTART_MS_MOD_PROBLEM = 9000  # the mod files could not be updated: more time to read why
     def __init__(self, root, httpd, fetcher=updater.fetch, exe_path=None, mod_dir=None, restart=None, lang=None, mod_dirs=None):
         import tkinter as tk
         from tkinter import ttk
@@ -418,6 +420,7 @@ class App:
             exe = updater.update_helper(rel, self.fetcher, prog, exe_path=self.exe_path) if (updater.is_frozen() or self.exe_path) else None
             msgs.append(t("py_update") if exe is None else t("helper_updated"))
             mod = self.mod_dir_override or updater.find_mod_dir()
+            mod_ok = True
             try:
                 if mod:
                     n = updater.update_mod(rel, mod, self.fetcher, prog)
@@ -425,9 +428,11 @@ class App:
                 else:
                     p = updater.save_mod_zip(rel, self.fetcher, prog)
                     msgs.append(t("mod_zip_saved", path=p))
-            except updater.UpdateError as e:
+            except (updater.UpdateError, OSError) as e:      # the program itself is already updated: say what is left, still restart into it
+                mod_ok = False
+                log.exception("mod update failed")
                 msgs.append(t("mod_not_updated", err=e))
-            return exe, msgs
+            return exe, msgs, mod_ok
 
         self.run_bg(work, self._update_done)
 
@@ -439,11 +444,12 @@ class App:
             self.progress.set("")
             self.btn_apply.configure(state="normal")
             return
-        exe, msgs = res
+        exe, msgs, mod_ok = res
         self.update_msg.set("\n".join(msgs))
         if exe:
+            # the new program opens and this one closes; when something went wrong with the mod files, leave time to read it first
             self.progress.set_key("restarting")
-            self.root.after(1200, lambda: self.quit(restart_exe=exe))
+            self.root.after(self.RESTART_MS if mod_ok else self.RESTART_MS_MOD_PROBLEM, lambda: self.quit(restart_exe=exe))
 
     def report(self):
         try:
