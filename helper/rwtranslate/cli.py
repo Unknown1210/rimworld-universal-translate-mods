@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, diagnostics, languages, logsetup, models, updater
+from . import config, __version__, diagnostics, languages, logsetup, models, updater
 from .server import DEFAULT_PORT, load_or_create_token, serve
 
 
@@ -55,6 +55,7 @@ def _update(a):
 
 
 def main(argv=None):
+    config.migrate_portuguese()
     ap = argparse.ArgumentParser(prog="rwtranslate")
     ap.add_argument("--version", action="version", version=__version__)
     ap.add_argument("--debug", action="store_true", help="log nível DEBUG")

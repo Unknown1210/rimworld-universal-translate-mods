@@ -119,6 +119,8 @@ def _load(src, tgt):
 
 def get_engine(src, tgt):
     """Engine for src->tgt: direct model, or pivot through English; loads installed models on first use."""
+    from . import languages
+    src, tgt = languages.model_code(src), languages.model_code(tgt)
     with _engines_lock:
         if (src, tgt) in _engines:
             return _engines[(src, tgt)]

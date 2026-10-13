@@ -4,6 +4,7 @@ Every request is logged (id, path, status, duration). The mod sends X-Request-Id
 the game log can be matched with the line in helper.log. Errors return {error, request_id, type}.
 """
 import json
+import re
 import secrets
 import threading
 import time
@@ -37,14 +38,14 @@ def load_or_create_token():
 
 
 def translate_texts(source, target, texts):
-    if source == target:
+    if languages.same(source, target):
         return list(texts)
     engine = get_engine(source, target)
     return [clean_output(t, translate_protected(t, engine.translate_batch), target) for t in texts]
 
 
 def _code_ok(c):
-    return isinstance(c, str) and 2 <= len(c) <= 3 and c.isalpha()
+    return isinstance(c, str) and re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z]{2})?", c) is not None
 
 
 class HttpError(Exception):

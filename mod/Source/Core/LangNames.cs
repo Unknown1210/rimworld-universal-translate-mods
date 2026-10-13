@@ -9,6 +9,7 @@ namespace AutoTranslate
         static readonly Dictionary<string, string[]> Names = new Dictionary<string, string[]>
         {
             {"en", new[]{"English","Inglês","English"}}, {"pt", new[]{"Portuguese","Português","Português"}},
+            {"pt-BR", new[]{"Portuguese (Brazil)","Português (Brasil)","Português (Brasil)"}}, {"pt-PT", new[]{"Portuguese (Portugal)","Português (Portugal)","Português (Portugal)"}},
             {"es", new[]{"Spanish","Espanhol","Español"}}, {"fr", new[]{"French","Francês","Français"}},
             {"de", new[]{"German","Alemão","Deutsch"}}, {"it", new[]{"Italian","Italiano","Italiano"}},
             {"ru", new[]{"Russian","Russo","Русский"}}, {"uk", new[]{"Ukrainian","Ucraniano","Українська"}},

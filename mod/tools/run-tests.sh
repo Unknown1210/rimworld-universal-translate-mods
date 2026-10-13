@@ -13,7 +13,7 @@ python3 -I - "$HERE" <<'PY'
 import sys
 sys.path.insert(0, sys.argv[1] + "/../helper")
 from rwtranslate import bulk
-bulk.write_cache("pt", "py.written", {bulk.normalize("A long\n      description   with spaces"): "Uma descrição longa"})
+bulk.write_cache("pt-BR", "py.written", {bulk.normalize("A long\n      description   with spaces"): "Uma descrição longa"})
 PY
 mcs -r:System.Xml.Linq -resource:"$HERE/Languages/English/Keyed/AutoTranslate.xml,AutoTranslate.English.xml" -out:"$OUT/harness.exe" -langversion:7 -nowarn:0649,0169,0414 $(find "$HERE/Source" "$HERE/tools/stubs" "$HERE/tools/tests" -name '*.cs')
 python3 -I "$HERE/tools/tests/serve_fake.py" > "$OUT/serve.out" 2>&1 &

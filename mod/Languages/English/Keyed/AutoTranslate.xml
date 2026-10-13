@@ -4,6 +4,12 @@
   <AT_Off>Translations are OFF - showing the original texts</AT_Off>
   <AT_BtnOff>Turn translations OFF (compare with the original)</AT_BtnOff>
   <AT_BtnOn>Turn translations ON</AT_BtnOn>
+  <AT_Hotkey>Shortcut to turn translations on/off: {0}</AT_Hotkey>
+  <AT_HotkeyNone>none</AT_HotkeyNone>
+  <AT_HotkeyPress>Press the key (with Shift, Ctrl or Alt if you want) now. Esc cancels.</AT_HotkeyPress>
+  <AT_BtnHotkeySet>Set shortcut</AT_BtnHotkeySet>
+  <AT_BtnHotkeyCancel>Cancel</AT_BtnHotkeyCancel>
+  <AT_BtnHotkeyClear>Remove shortcut</AT_BtnHotkeyClear>
   <AT_TargetFromHelper>Translating into: {0} (chosen in the translator program).</AT_TargetFromHelper>
   <AT_TargetFromGame>Translating into: {0} (the game's language). Choose another one in the translator program.</AT_TargetFromGame>
   <AT_TargetNone>No target language yet: choose one in the translator program.</AT_TargetNone>
@@ -22,6 +28,7 @@
   <AT_OptDefs>Translate items, buildings, etc. (Defs)</AT_OptDefs>
   <AT_OptKeyed>Translate interface texts (Keyed)</AT_OptKeyed>
   <AT_OptMeta>Translate mod descriptions (Mods screen)</AT_OptMeta>
+  <AT_OptPseudo>Hide the accent-marked texts the game shows in developer mode (original text is shown instead)</AT_OptPseudo>
   <AT_OptVerbose>Detailed log</AT_OptVerbose>
   <AT_BtnCheck>Check translator program</AT_BtnCheck>
   <AT_BtnLogs>Open logs folder</AT_BtnLogs>

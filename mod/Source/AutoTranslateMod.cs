@@ -54,12 +54,21 @@ namespace AutoTranslate
         {
             try
             {
+                if (Hotkey.Capturing && Event.current != null && Event.current.type == EventType.KeyDown)
+                {
+                    Hotkey.Capture(Event.current);
+                    Event.current.Use();
+                }
                 var l = new Listing_Standard();
                 l.Begin(inRect);
                 // 1) the live switch: compare with the original texts without leaving the game
                 bool off = Pipeline.Suspended;
                 l.Label(off ? "<color=#ffb347>" + T.Get("AT_Off") + "</color>" : "<color=#88dd88>" + T.Get("AT_On") + "</color>");
                 if (l.ButtonText(off ? T.Get("AT_BtnOn") : T.Get("AT_BtnOff"))) Safe.Run("switch", () => Pipeline.SetSuspended(!off));
+                // the shortcut: one key plus optional Shift / Ctrl / Alt, switches the translations in real time while playing
+                l.Label(Hotkey.Capturing ? "<color=#ffd966>" + T.Get("AT_HotkeyPress") + "</color>" : T.Get("AT_Hotkey", Hotkey.Label(Settings)));
+                if (l.ButtonText(Hotkey.Capturing ? T.Get("AT_BtnHotkeyCancel") : T.Get("AT_BtnHotkeySet"))) Hotkey.Capturing = !Hotkey.Capturing;
+                if (!string.IsNullOrEmpty(Settings.hotkeyKey) && l.ButtonText(T.Get("AT_BtnHotkeyClear"))) Safe.Run("hotkey", Hotkey.Clear);
                 l.Gap(4f);
                 // 2) the target language is chosen once, in the translator program
                 l.Label(TargetLine());
@@ -78,6 +87,7 @@ namespace AutoTranslate
                     l.CheckboxLabeled(T.Get("AT_OptDefs"), ref Settings.translateDefs);
                     l.CheckboxLabeled(T.Get("AT_OptKeyed"), ref Settings.translateKeyed);
                     l.CheckboxLabeled(T.Get("AT_OptMeta"), ref Settings.translateMeta);
+                    l.CheckboxLabeled(T.Get("AT_OptPseudo"), ref Settings.hidePseudo);
                     l.CheckboxLabeled(T.Get("AT_OptVerbose"), ref Settings.debugLog);
                     AtLog.DebugEnabled = Settings.debugLog;
                     if (helperCheckResult.Length > 0) l.Label(helperCheckResult);
@@ -113,6 +123,7 @@ namespace AutoTranslate
 
         public override void WriteSettings()
         {
+            Hotkey.Capturing = false;
             base.WriteSettings();
             Safe.Run("settings", () => AtLog.Info("settings", "saved: " + Settings.Describe()));
             if (Pipeline.SettingsChangedSinceStart()) Safe.Run("reload", Pipeline.Reload);   // new language / options / per-mod choices take effect now, no restart
@@ -133,6 +144,6 @@ namespace AutoTranslate
     [HarmonyPatch(typeof(Root), nameof(Root.Update))]
     public static class Patch_Root_Update
     {
-        public static void Postfix() { Pipeline.Tick(); }
+        public static void Postfix() { Pipeline.Tick(); Safe.Run("hotkey", Hotkey.Check); }
     }
 }

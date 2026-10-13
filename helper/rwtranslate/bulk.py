@@ -72,6 +72,26 @@ def write_cache(target, package_id, entries):
     os.replace(tmp, p)
 
 
+def clear_translations(target):
+    """Delete every saved translation for `target` (the cache files the game reads) and forget what was done, so the mods
+    show as new again. The player's manual corrections (overrides) are kept. Returns the number of files deleted."""
+    n = 0
+    d = data_dir() / "cache" / target
+    if d.is_dir():
+        for f in d.iterdir():
+            if f.is_file():
+                try:
+                    f.unlink()
+                    n += 1
+                except OSError:
+                    log.warning("could not delete %s", f, exc_info=True)
+    st = state_load()
+    if st.pop(target, None) is not None:
+        state_save(st)
+    log.info("cleared %d translation file(s) for %s", n, target)
+    return n
+
+
 # ---------------------------------------------------------------- discovering mods
 
 class ModInfo:
@@ -80,21 +100,33 @@ class ModInfo:
         self.fingerprint = None
 
 
-def mods_dirs(extra=()):
-    """Folders that contain mod folders: Steam's RimWorld/Mods and Workshop content, plus the ones the user added."""
-    cand = [Path(p) for p in extra] + [Path(p) for p in (config.get("mods_dirs") or [])]
+def dir_entries(extra=()):
+    """Every folder searched for mods, in the order they are searched: [(Path, kind, exists)].
+    kind is "default" (Steam's RimWorld/Mods and Workshop folders) or "added" (chosen by the user, saved in config.json).
+    Folders the user added are kept even when they do not exist (yet), so the window can say so."""
+    cand = []
     for lib in updater._steam_libraries():
-        cand += [lib / "steamapps" / "common" / "RimWorld" / "Mods", lib / "steamapps" / "workshop" / "content" / RIMWORLD_APP_ID]
+        cand += [(lib / "steamapps" / "common" / "RimWorld" / "Mods", "default"),
+                 (lib / "steamapps" / "workshop" / "content" / RIMWORLD_APP_ID, "default")]
+    cand += [(Path(p), "added") for p in list(extra) + list(config.get("mods_dirs") or [])]
     seen, out = set(), []
-    for d in cand:
+    for d, kind in cand:
+        exists = d.is_dir()
+        if kind == "default" and not exists:
+            continue                                      # a default location that is not there is not worth listing
         try:
             key = str(d.resolve())
         except OSError:
-            continue
-        if d.is_dir() and key not in seen:
+            key = str(d)
+        if key not in seen:
             seen.add(key)
-            out.append(d)
+            out.append((d, kind, exists))
     return out
+
+
+def mods_dirs(extra=()):
+    """Folders that contain mod folders and exist (see dir_entries)."""
+    return [d for d, _kind, exists in dir_entries(extra) if exists]
 
 
 def _parse(path):
@@ -225,15 +257,16 @@ def is_placeholder(cover_value, source_text, target):
         return True
     sl = langdetect.script_lang(v)
     if sl is not None:
-        return sl != target
+        return not languages.same(sl, target)
     lat, conf, _ = langdetect.latin_lang([v])
-    return bool(conf and lat != target)
+    return bool(conf and not languages.same(lat, target))
 
 
 def build_coverage(mods, target):
     """What the installed mods say they translate into `target`: {def field: [(provider mod, value)]} and {Keyed key: [...]}.
     Whether an entry is a REAL translation is decided per text (see is_placeholder)."""
     defs, keys = {}, {}
+    target = languages.norm_target(target)               # an old "pt" setting means Brazilian Portuguese (folder PortugueseBrazilian)
     for m in mods:
         for d in content_dirs(m):
             langs = d / "Languages"
@@ -366,7 +399,7 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
     groups = {}
     for text in items:
         lang = langdetect.script_lang(text) or lat
-        if lang == target:
+        if languages.same(lang, target):
             res.already_target += 1
             if len(res.skipped) < SKIP_LIST_MAX:
                 res.skipped.append({"text": text, "reason": "already_target", "detail": lang})

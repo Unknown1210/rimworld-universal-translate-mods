@@ -10,6 +10,7 @@ REQUIRED = [
     "AutoTranslate/1.6/Assemblies/RimWorldAutoTranslate.dll",
     "AutoTranslate/Languages/English/Keyed/AutoTranslate.xml",
     "AutoTranslate/Languages/PortugueseBrazilian/Keyed/AutoTranslate.xml",
+    "AutoTranslate/Languages/Portuguese/Keyed/AutoTranslate.xml",
 ]
 names = set(zipfile.ZipFile(sys.argv[1]).namelist())
 missing = [r for r in REQUIRED if r not in names]

@@ -65,16 +65,57 @@ class Protect(unittest.TestCase):
 
 class Lang(unittest.TestCase):
     def test_game_names(self):
-        self.assertEqual(languages.code_from_game_language("Português Brasileiro"), "pt")
+        self.assertEqual(languages.code_from_game_language("Português Brasileiro"), "pt-BR")
+        self.assertEqual(languages.code_from_game_language("PortugueseBrazilian"), "pt-BR")
+        self.assertEqual(languages.code_from_game_language("Português"), "pt-PT")
+        self.assertEqual(languages.code_from_game_language("Portuguese"), "pt-PT")
         self.assertEqual(languages.code_from_game_language("Español Latino"), "es")
         self.assertEqual(languages.code_from_game_language("English"), "en")
         self.assertIsNone(languages.code_from_game_language("Klingon"))
 
     def test_suggest_rules(self):
         self.assertEqual(languages.suggest("Français", system="pt"), "fr")      # game wins
-        self.assertEqual(languages.suggest("English", system="pt"), "pt")       # english game -> system
+        self.assertEqual(languages.suggest("English", system="pt"), "pt-BR")    # english game -> system (Portuguese without a region: Brazil)
+        self.assertEqual(languages.suggest("Portuguese"), "pt-PT")              # the game's own Portuguese is the European one
         self.assertIsNone(languages.suggest("English", system="en"))            # ask user
         self.assertEqual(languages.suggest(None, system="de"), "de")
+
+    def test_portuguese_variants(self):
+        self.assertEqual(languages.norm_target("pt"), "pt-BR")                  # old settings
+        self.assertEqual(languages.norm_target("pt_br"), "pt-BR")
+        self.assertEqual(languages.norm_target("PT-pt"), "pt-PT")
+        self.assertEqual(languages.norm_target("JA"), "ja")
+        self.assertEqual(languages.model_code("pt-BR"), "pb")
+        self.assertEqual(languages.model_code("pt-PT"), "pt")
+        self.assertEqual(languages.model_code("pt"), "pt", "a plain pt is a source language and keeps its model")
+        self.assertEqual(languages.model_code("es"), "es")
+        self.assertTrue(languages.same("pt", "pt-BR") and languages.same("pb", "pt-PT") and not languages.same("pt-BR", "es"))
+        from rwtranslate import models
+        idx = [{"from_code": "en", "to_code": "pb"}, {"from_code": "pb", "to_code": "en"}, {"from_code": "en", "to_code": "pt"}]
+        self.assertEqual(models.plan("en", "pt-BR", idx), [("en", "pb")], "Brazil uses its own model")
+        self.assertEqual(models.plan("en", "pt-PT", idx), [("en", "pt")])
+        self.assertEqual(models.plan("pt", "pt-BR", idx), [], "same language: nothing to translate")
+        self.assertEqual(models.available_targets(idx), ["pt-BR", "pt-PT"])
+
+    def test_old_pt_settings_become_brazilian(self):
+        from rwtranslate import config
+        from rwtranslate.paths import data_dir
+        old, new = data_dir() / "cache" / "pt", data_dir() / "cache" / "pt-BR"
+        had_new = new.exists()
+        old_target = config.get("target")
+        try:
+            if not had_new:
+                old.mkdir(parents=True, exist_ok=True)
+                (old / "m.json").write_text("{}")
+                config.set("target", "pt")
+                config.migrate_portuguese()
+                self.assertTrue((new / "m.json").exists() and not old.exists(), "saved translations moved to pt-BR")
+                self.assertEqual(config.get("target"), "pt-BR")
+        finally:
+            config.set("target", old_target)
+            if not had_new and new.exists():
+                import shutil
+                shutil.rmtree(new, ignore_errors=True)
 
     def test_sentences(self):
         self.assertEqual(split_sentences("One. Two! Three?"), ["One.", "Two!", "Three?"])

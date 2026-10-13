@@ -15,7 +15,7 @@ namespace AutoTranslate
         static readonly Dictionary<string, string> Table = new Dictionary<string, string>
         {
             {"english","en"},
-            {"portuguese","pt"},{"portuguesebrazilian","pt"},{"portugues","pt"},{"portuguesbrasileiro","pt"},
+            {"portuguese","pt-PT"},{"portugues","pt-PT"},{"portuguesebrazilian","pt-BR"},{"portuguesbrasileiro","pt-BR"},
             {"spanish","es"},{"spanishlatin","es"},{"espanol","es"},{"espanollatino","es"},
             {"french","fr"},{"francais","fr"},{"german","de"},{"deutsch","de"},{"italian","it"},{"italiano","it"},
             {"russian","ru"},{"russkij","ru"},{"polish","pl"},{"polski","pl"},{"turkish","tr"},{"turkce","tr"},
@@ -36,6 +36,35 @@ namespace AutoTranslate
             return sb.ToString();
         }
 
+        /// <summary>Canonical target code: "pt" (old settings), "pb" and "pt-br" become "pt-BR"; "pt-pt" becomes "pt-PT"; others are lowercased.</summary>
+        public static string NormTarget(string code)
+        {
+            if (string.IsNullOrEmpty(code)) return code;
+            string c = code.Trim().Replace('_', '-').ToLowerInvariant();
+            if (c == "pt" || c == "pb" || c == "pt-br") return "pt-BR";
+            if (c == "pt-pt") return "pt-PT";
+            return c;
+        }
+
+        /// <summary>Language without region: pt-BR, pt-PT and pb are all "pt".</summary>
+        public static string Family(string code)
+        {
+            if (string.IsNullOrEmpty(code)) return code;
+            string b = code.Replace('_', '-').Split('-')[0].ToLowerInvariant();
+            return b == "pb" ? "pt" : b;
+        }
+
+        /// <summary>Same language (the variants of Portuguese cannot be told apart in a text, so they count as one).</summary>
+        public static bool Same(string a, string b) { return !string.IsNullOrEmpty(a) && !string.IsNullOrEmpty(b) && Family(a) == Family(b); }
+
+        /// <summary>Code of the translation model: pt-BR -> pb, pt-PT -> pt, the rest unchanged (what the helper lists in /health).
+        /// A plain "pt" is a SOURCE language and keeps its model "pt".</summary>
+        public static string ModelCode(string code)
+        {
+            string c = (code ?? "").Replace('_', '-').ToLowerInvariant();
+            return c == "pt-br" ? "pb" : c == "pt-pt" ? "pt" : code;
+        }
+
         public static string FromName(string name)
         {
             string code;
@@ -53,6 +82,8 @@ namespace AutoTranslate
         public static string FromSystem()
         {
             string c = FromName(Application.systemLanguage.ToString());
+            if (c != null && Family(c) == "pt")      // the region of the OS tells Brazil from Portugal; without one, Brazil
+                return CultureInfo.CurrentUICulture.Name.StartsWith("pt-PT", StringComparison.OrdinalIgnoreCase) ? "pt-PT" : "pt-BR";
             if (c != null) return c;
             string two = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
             return string.IsNullOrEmpty(two) || two == "iv" ? null : two.ToLowerInvariant();
@@ -74,7 +105,7 @@ namespace AutoTranslate
                 var root = Json.Parse(File.ReadAllText(f, Encoding.UTF8)) as System.Collections.Generic.Dictionary<string, object>;
                 object v;
                 string t = root != null && root.TryGetValue("target", out v) ? v as string : null;
-                return string.IsNullOrWhiteSpace(t) ? null : t.Trim().ToLowerInvariant();
+                return string.IsNullOrWhiteSpace(t) ? null : NormTarget(t);
             }
             catch (Exception e) { AtLog.Warn("config", "cannot read config.json (ignored)", e); return null; }
         }
@@ -85,7 +116,7 @@ namespace AutoTranslate
             if (!string.IsNullOrEmpty(setting) && !string.Equals(setting, "auto", StringComparison.OrdinalIgnoreCase))
             {
                 how = "manual setting";
-                return setting.Trim().ToLowerInvariant();
+                return NormTarget(setting);
             }
             string chosen = ConfigTarget();                     // the player's choice in the translator program wins
             if (chosen != null) { how = "chosen in the translator program"; return chosen; }

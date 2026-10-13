@@ -29,9 +29,19 @@ public static class Harness
         try { Json.Parse("{\"a\":"); Check(false, "json rejects truncated"); } catch (FormatException e) { Check(e.Message.Contains("line"), "json error has position: " + e.Message); }
 
         // ---- LangMap
-        Check(LangMap.FromName("Português Brasileiro") == "pt", "LangMap pt-BR native name");
-        Check(LangMap.FromName("PortugueseBrazilian") == "pt" && LangMap.FromName("SpanishLatin") == "es", "LangMap folder names");
+        Check(LangMap.FromName("Português Brasileiro") == "pt-BR" && LangMap.FromName("Português") == "pt-PT", "LangMap pt-BR / pt-PT native names");
+        Check(LangMap.FromName("PortugueseBrazilian") == "pt-BR" && LangMap.FromName("Portuguese") == "pt-PT" && LangMap.FromName("SpanishLatin") == "es", "LangMap folder names");
+        Check(LangMap.NormTarget("pt") == "pt-BR" && LangMap.NormTarget("pt_br") == "pt-BR" && LangMap.NormTarget("PT-pt") == "pt-PT" && LangMap.NormTarget("JA") == "ja", "old \"pt\" setting becomes Brazilian Portuguese");
+        Check(LangMap.Same("pt", "pt-BR") && LangMap.Same("pb", "pt-PT") && !LangMap.Same("pt-BR", "es") && LangMap.ModelCode("pt-BR") == "pb" && LangMap.ModelCode("pt-PT") == "pt" && LangMap.ModelCode("pt") == "pt", "Portuguese variants: same language, own model codes");
         Check(LangMap.FromName("Klingon") == null, "LangMap unknown");
+        {
+            string pr = null;
+            bool run = Patch_Translator_PseudoTranslated.Prefix("Search and rescue", ref pr);
+            Check(!run && pr == "Search and rescue", "developer-mode accent marks: the original text is handed back and the game's method is skipped");
+            AutoTranslateMod.Settings = new AtSettings { hidePseudo = false };
+            Check(Patch_Translator_PseudoTranslated.Prefix("x", ref pr), "with the option off the game's own method runs");
+            AutoTranslateMod.Settings = new AtSettings();
+        }
 
         // ---- LangDetect
         bool conf; string det;
@@ -67,11 +77,11 @@ public static class Harness
 
         // ---- HelperClient against the real Python helper
         var h = HelperClient.Health();
-        Check(h.Protocol == 2 && h.HasPair("en", "pt") && h.HasPair("zh", "pt") && !h.HasPair("ja", "pt"), "helper health: protocol " + h.Protocol + " models " + string.Join(",", h.Installed.ToArray()));
+        Check(h.Protocol == 2 && h.HasPair("en", "pt-BR") && h.HasPair("zh", "pt-BR") && !h.HasPair("ja", "pt-BR"), "helper health: protocol " + h.Protocol + " models " + string.Join(",", h.Installed.ToArray()));
         string rid;
-        var res = HelperClient.Translate("en", "pt", new[] { "Iron sword", "Hit {0} with <b>force</b>" }, out rid);
+        var res = HelperClient.Translate("en", "pt-BR", new[] { "Iron sword", "Hit {0} with <b>force</b>" }, out rid);
         Check(res[0] == "Iron sword (pt)" && res[1] == "Hit {0} with <b>force</b> (pt)", "translate keeps markers: " + res[1]);
-        try { HelperClient.Translate("en", "pt", new[] { "EXPLODE now" }, out rid); Check(false, "engine failure should throw"); }
+        try { HelperClient.Translate("en", "pt-BR", new[] { "EXPLODE now" }, out rid); Check(false, "engine failure should throw"); }
         catch (HelperException hx) { Check(hx.Status == 500 && hx.Body.Contains(hx.RequestId), "500 carries request id " + hx.RequestId); }
         try { HelperClient.Translate("en", "xx", new[] { "a" }, out rid); Check(false, "missing model should throw"); }
         catch (HelperException hx) { Check(hx.Status == 409, "missing model -> 409"); }
@@ -182,7 +192,7 @@ public static class Harness
         AutoTranslateMod.Settings = new AtSettings();
         var w = Build(home, "s1", true);
         Run("auto");
-        Check(Pipeline.Target == "pt" && Pipeline.GameIsTarget, "target pt from game language");
+        Check(Pipeline.Target == "pt-BR" && Pipeline.GameIsTarget, "target pt-BR from game language");
         Check(!Pipeline.Mods.Any(m => m.Id == "ludeon.rimworld"), "official mod not tracked");
         Check(w.Sword.label == "iron sword (pt)" && w.Sword.description == "A {0} sword. (pt)", "uncovered strings translated, markers kept");
         Check(w.Shield.label == "escudo de madeira", "string covered by THIRD-PARTY mod left to the translator mod (not retranslated)");
@@ -198,8 +208,8 @@ public static class Harness
         Check(w.Fine.label == "fine text one" && w.X1.label == "EXPLODE one", "bad mod's changes reverted (back to original)");
         Check(StateStore.GetDisabledReason("d.bad") != null, "disable persisted to disk");
         Check(!Mod("a.good").AutoDisabled && !Mod("b.partial").AutoDisabled, "other mods unaffected by the bad one");
-        Check(File.Exists(Path.Combine(Paths.CacheDir, "pt/a.good.json")) && File.Exists(Path.Combine(Paths.CacheDir, "pt/b.partial.json")), "one cache file per mod");
-        string aCache = File.ReadAllText(Path.Combine(Paths.CacheDir, "pt/a.good.json"));
+        Check(File.Exists(Path.Combine(Paths.CacheDir, "pt-BR/a.good.json")) && File.Exists(Path.Combine(Paths.CacheDir, "pt-BR/b.partial.json")), "one cache file per mod");
+        string aCache = File.ReadAllText(Path.Combine(Paths.CacheDir, "pt-BR/a.good.json"));
         Check(aCache.Contains("iron sword") && !aCache.Contains("wooden shield"), "cache has only what was translated (not covered strings)");
         Check(Directory.GetFiles(Paths.LogDir, "crash-*.txt").Any(f => File.ReadAllText(f).Contains("mod-disabled:d.bad")), "report file written when a mod is disabled");
 
@@ -389,7 +399,7 @@ public static class Harness
         foreach (object o in list) { var pair = (List<object>)o; if (TranslationCache.Norm((string)pair[0]) != (string)pair[1]) { bad++; Console.WriteLine("  mismatch: " + pair[0]); } }
         Check(bad == 0, "cache key normalization matches the helper's (" + list.Count + " shared vectors)");
         // a cache file written by the helper's bulk translation (Python) is found by the game (C#), whatever the whitespace
-        var c = new TranslationCache("pt"); string tr;
+        var c = new TranslationCache("pt-BR"); string tr;
         Check(c.TryGet("py.written", "A long\n      description   with spaces", out tr) && tr == "Uma descrição longa", "cache written by the helper is found with a differently formatted source text");
         c.Put("m.norm", "  Hello   world \r\n again ", "Olá");
         Check(c.TryGet("m.norm", "Hello world\nagain", out tr) && tr == "Olá", "put and get agree on the normalized key");
@@ -409,7 +419,7 @@ public static class Harness
         var b = BuildBidir(home, "cfg");
         Pipeline.TargetPollMs = 0;
         Run("auto");
-        Check(Pipeline.Target == "pt" && b.ZhLabel.label == "铁剑 (pt from zh)", "auto target follows the translator program (pt): " + b.ZhLabel.label);
+        Check(Pipeline.Target == "pt-BR" && b.ZhLabel.label == "铁剑 (pt from zh)", "auto target follows the translator program (pt): " + b.ZhLabel.label);
         File.WriteAllText(cfg, "{\"target\":\"en\"}");
         Pipeline.Tick();
         WaitWorker(System.Diagnostics.Stopwatch.StartNew());

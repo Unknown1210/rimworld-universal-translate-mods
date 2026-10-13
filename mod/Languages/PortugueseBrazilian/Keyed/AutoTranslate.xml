@@ -4,6 +4,12 @@
   <AT_Off>Traduções DESATIVADAS - mostrando os textos originais</AT_Off>
   <AT_BtnOff>Desativar traduções (comparar com o original)</AT_BtnOff>
   <AT_BtnOn>Ativar traduções</AT_BtnOn>
+  <AT_Hotkey>Atalho para ativar/desativar as traduções: {0}</AT_Hotkey>
+  <AT_HotkeyNone>nenhum</AT_HotkeyNone>
+  <AT_HotkeyPress>Aperte a tecla agora (com Shift, Ctrl ou Alt, se quiser). Esc cancela.</AT_HotkeyPress>
+  <AT_BtnHotkeySet>Definir atalho</AT_BtnHotkeySet>
+  <AT_BtnHotkeyCancel>Cancelar</AT_BtnHotkeyCancel>
+  <AT_BtnHotkeyClear>Remover atalho</AT_BtnHotkeyClear>
   <AT_TargetFromHelper>Traduzindo para: {0} (escolhido no programa tradutor).</AT_TargetFromHelper>
   <AT_TargetFromGame>Traduzindo para: {0} (o idioma do jogo). Escolha outro no programa tradutor.</AT_TargetFromGame>
   <AT_TargetNone>Ainda sem idioma de destino: escolha um no programa tradutor.</AT_TargetNone>
@@ -22,6 +28,7 @@
   <AT_OptDefs>Traduzir itens, construções etc. (Defs)</AT_OptDefs>
   <AT_OptKeyed>Traduzir textos de interface (Keyed)</AT_OptKeyed>
   <AT_OptMeta>Traduzir descrições dos mods (tela de Mods)</AT_OptMeta>
+  <AT_OptPseudo>Esconder os textos com acentos estranhos que o jogo mostra no modo desenvolvedor (mostra o texto original)</AT_OptPseudo>
   <AT_OptVerbose>Log detalhado</AT_OptVerbose>
   <AT_BtnCheck>Verificar programa tradutor</AT_BtnCheck>
   <AT_BtnLogs>Abrir pasta de logs</AT_BtnLogs>

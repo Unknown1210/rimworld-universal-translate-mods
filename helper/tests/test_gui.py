@@ -151,15 +151,21 @@ class Window(unittest.TestCase):
         self.assertEqual(app.selected_target(), "ja", "the pick survives a window-language change")
         self.assertTrue(any(l.startswith("Japanese") for l in app.lang_codes))
 
-    def test_only_the_15_common_languages_by_full_name(self):
+    def test_only_supported_languages_by_full_name(self):
         from rwtranslate import i18n
         app = self.build(fake_fetcher(release_json("v0.0")))
         codes = set(app.lang_codes.values())
-        self.assertEqual(codes, set(i18n.COMMON15))
-        self.assertEqual(len(app.lang_codes), 15)
+        self.assertEqual(codes, set(i18n.SUPPORTED_TARGETS))
+        self.assertNotIn("pt", codes, "Portuguese is offered as Brazil or Portugal")
+        self.assertIn("pt-BR", codes)
+        self.assertIn("pt-PT", codes)
+        self.assertIn("Português (Brasil)", app.lang_codes)
+        self.assertIn("Português (Portugal)", app.lang_codes)
         for label in app.lang_codes:
             self.assertGreater(len(label), 3, f"'{label}' looks like a bare code")
         self.assertEqual(app.nb.tab(app.bulk_tab, "text"), "Traduzir mods")
+        app.set_lang("en")
+        self.assertIn("Portuguese (Brazil) (Português (Brasil))", app.lang_codes)
 
     def test_target_language_is_saved_for_the_game_mod(self):
         from rwtranslate import config
@@ -183,7 +189,7 @@ class BulkTab(unittest.TestCase):
         cls.models = models
         cls.old_url = models.INDEX_URL
         idx = os.path.join(HOME, "bulk-index.json")
-        json.dump([{"from_code": "en", "to_code": "pt", "package_version": "1", "links": ["x"]}], open(idx, "w"))
+        json.dump([{"from_code": "en", "to_code": "pb", "package_version": "1", "links": ["x"]}], open(idx, "w"))
         models.INDEX_URL = "file://" + idx
         models._index_mem["data"] = None
 
@@ -192,9 +198,10 @@ class BulkTab(unittest.TestCase):
                 self.s, self.t = s, t
 
             def translate_batch(self, texts):
-                return [f"{x} ({self.t})" if self.s == "en" else f"{x} ({self.t} from {self.s})" for x in texts]
+                t = "pt" if self.t == "pb" else self.t           # "pb" = the Brazilian Portuguese model
+                return [f"{x} ({t})" if self.s == "en" else f"{x} ({t} from {self.s})" for x in texts]
         cls.made = []
-        for s_, t_ in (("en", "pt"), ("zh", "pt")):
+        for s_, t_ in (("en", "pb"), ("zh", "pb")):
             set_engine(s_, t_, Fake(s_, t_))
             d = models.models_dir() / f"{s_}_{t_}"
             if not d.exists():
@@ -219,7 +226,7 @@ class BulkTab(unittest.TestCase):
 
     def test_search_translate_find_new_and_summary(self):
         from rwtranslate import bulk, config, gui, server
-        config.set("target", "pt")
+        config.set("target", "pt-BR")
         root = Path(tempfile.mkdtemp())
         self.mod(root, "A", "a.mod", "Alpha Mod", "<ThingDef><defName>X</defName><label>iron sword</label><description>A sharp sword for fighting.</description></ThingDef>")
         self.mod(root, "B", "b.mod", "Beta Mod", "<ThingDef><defName>Y</defName><label>铁剑</label></ThingDef>")
@@ -228,6 +235,12 @@ class BulkTab(unittest.TestCase):
         r = tkinter.Tk()
         try:
             app = gui.App(r, httpd, fetcher=fake_fetcher(release_json("v0.0")), lang="pt", mod_dirs=[root])
+            # 0) the folders that are searched are listed (numbered, with what kind each one is) before the progress bar
+            self.assertTrue(pump(r, lambda: str(app.lbl_dirs.cget("text")).startswith("1. ")), "folder list is shown")
+            shown = str(app.lbl_dirs.cget("text"))
+            self.assertIn(str(root), shown)
+            self.assertIn("adicionada por você", shown)
+            self.assertIn("Pastas pesquisadas", str(app.dirs_frame.cget("text")))
             # 1) search: two NEW mods listed, button offers to translate them
             self.assertTrue(pump(r, lambda: len(app.plan_rows) == 2), "scan lists the mods")
             self.assertEqual(sorted(s for _m, s, _r in app.plan_rows), ["new", "new"])
@@ -244,13 +257,37 @@ class BulkTab(unittest.TestCase):
             self.assertEqual([str(v[4]) for v in rows], ["Traduzido", "Traduzido"])
             alpha = next(v for v in rows if v[0] == "Alpha Mod")
             self.assertEqual((str(alpha[1]), int(alpha[2]), int(alpha[3])), ("en", 2, 2 + 5), "source language, texts and words per mod")
-            self.assertEqual(bulk.read_cache("pt", "b.mod")["铁剑"], "铁剑 (pt from zh)")
+            self.assertEqual(bulk.read_cache("pt-BR", "b.mod")["铁剑"], "铁剑 (pt from zh)")
             # 3) a mod installed later is found again
             self.mod(root, "C", "c.mod", "Gamma Mod", "<ThingDef><defName>Z</defName><label>steel axe</label></ThingDef>")
             app.btn_scan.invoke()
             self.assertTrue(pump(r, lambda: len(app.plan_rows) == 3 and not app.bulk_running), "rescan sees the new mod")
             self.assertEqual(sorted(s for _m, s, _r in app.plan_rows), ["new", "ok", "ok"])
             self.assertIn("Traduzir pendentes (1)", str(app.btn_bulk.cget("text")))
+            # 3a) columns: names centred except the mod; the last column opens the mod's folder
+            for col in ("source", "texts", "words", "state", "folder"):
+                self.assertEqual(str(app.tree.column(col, "anchor")), "center", col)
+                self.assertEqual(str(app.tree.heading(col, "anchor")), "center", col)
+            self.assertEqual(str(app.tree.column("mod", "anchor")), "w")
+            self.assertEqual(app.tree.heading("folder")["text"], "Pasta")
+            opened = []
+            gui.open_folder = lambda path: opened.append(path)
+            app.nb.select(app.bulk_tab)                       # the list must be on screen for the pixel positions to exist
+            r.geometry("900x700")
+            r.update()
+            iid = app.rows["a.mod"]
+            app.tree.selection_set(iid)
+            app.tree.see(iid)
+            r.update()
+            bx, by, bw, bh = app.tree.bbox(iid, "#6")
+            ev = type("Ev", (), {"x": bx + bw // 2, "y": by + bh // 2})()
+            self.assertEqual(app.tree.item(iid, "values")[5], "Abrir pasta")
+            self.assertEqual(app.on_tree_click(ev), "break")
+            self.assertEqual(opened, [str(root / "A")], "clicking the folder column opens the mod folder")
+            bx, by, bw, bh = app.tree.bbox(iid, "#1")
+            ev1 = type("Ev", (), {"x": bx + 5, "y": by + bh // 2})()
+            self.assertIsNone(app.on_tree_click(ev1))
+            self.assertEqual(len(opened), 1, "clicking another column does not open the folder")
             # 3b) double-click on a mod: window with what was translated (and why other texts were left alone)
             top = app.show_details("a.mod")
             self.assertIsNotNone(top)
@@ -263,13 +300,40 @@ class BulkTab(unittest.TestCase):
             r.update()
             self.assertIn("Tradução:", top.details["text"].get("1.0", "end"))
             self.assertIn("Detalhes: Alpha Mod", top.title())
+            # 3c) with the details window OPEN, changing the language of the main window redraws it too (same tab, same row)
+            app.set_lang("en")
+            self.assertEqual(top.title(), "Details: Alpha Mod")
+            self.assertEqual(top.details["nb"].tab(0, "text"), "Translated (2)")
+            self.assertEqual(top.details["translated"].heading("o")["text"], "Original")
+            self.assertEqual(top.details["translated"].heading("t")["text"], "Translation")
+            self.assertIn("Translation:", top.details["text"].get("1.0", "end"), "the selected row stays selected, text in English")
+            self.assertNotIn("Tradução:", top.details["text"].get("1.0", "end"))
+            self.assertIn("added by you", str(app.lbl_dirs.cget("text")))
+            self.assertIn("Folders searched", str(app.dirs_frame.cget("text")))
+            app.set_lang("pt")
+            self.assertEqual(top.title(), "Detalhes: Alpha Mod")
+            self.assertEqual(top.details["translated"].heading("t")["text"], "Tradução")
             top.destroy()
+            app.set_lang("en")
+            app.set_lang("pt")
             # 4) window language changes the table and the labels too
             app.set_lang("en")
             self.assertIn("Translate pending (1)", str(app.btn_bulk.cget("text")))
             self.assertEqual(app.tree.heading("state")["text"], "State")
             self.assertEqual(app.nb.tab(app.bulk_tab, "text"), "Translate mods")
             self.assertEqual({app.tree.item(i, "values")[4] for i in app.tree.get_children()}, {"Translated", "New (not translated)"})
+            # 4b) delete translations: asks first; "no" keeps everything, "yes" empties the cache and lists the mods as new again
+            self.assertEqual(str(app.btn_clear.cget("state")), "normal")
+            app.ask_yes_no = lambda title, text: False
+            app.btn_clear.invoke()
+            self.assertTrue(bulk.read_cache("pt-BR", "b.mod"), "answering no deletes nothing")
+            asked = []
+            app.ask_yes_no = lambda title, text: asked.append(text) or True
+            app.btn_clear.invoke()
+            self.assertTrue(asked and ("Português (Brasil)" in asked[0] or "Portuguese (Brazil)" in asked[0]), "the question names the language")
+            self.assertTrue(pump(r, lambda: len(app.plan_rows) == 3 and not app.bulk_running and all(s == "new" for _m, s, _r in app.plan_rows)))
+            self.assertEqual(bulk.read_cache("pt-BR", "b.mod"), {}, "the saved translations are gone")
+            self.assertEqual(sorted(s for _m, s, _r in app.plan_rows), ["new", "new", "new"])
             # 5) no target language: asks for one instead of translating
             config.set("target", None)
             app.lang_box.set("")

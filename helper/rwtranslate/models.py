@@ -10,7 +10,7 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from . import logsetup
+from . import languages, logsetup
 from .paths import models_dir
 
 log = logsetup.get("models")
@@ -53,11 +53,22 @@ def available_pairs(index=None):
 
 
 def available_targets(index=None):
-    """Languages reachable from English (used to suggest targets)."""
-    return sorted({t for s, t in available_pairs(index) if s == PIVOT})
+    """Target languages reachable from English, as the codes the program uses (Portuguese is split into pt-BR and pt-PT)."""
+    out = set()
+    for s, t in available_pairs(index):
+        if s != PIVOT:
+            continue
+        if t == "pb":
+            out.add("pt-BR")
+        elif t == "pt":
+            out.add("pt-PT")
+        else:
+            out.add(t)
+    return sorted(out)
 
 
 def pair_dir(src, tgt):
+    src, tgt = languages.model_code(src), languages.model_code(tgt)
     return models_dir() / f"{src}_{tgt}"
 
 
@@ -81,8 +92,9 @@ def installed_targets():
 
 def plan(src, tgt, index=None):
     """Steps (list of (src,tgt)) needed to translate src->tgt: direct, or pivot through English."""
-    if src == tgt:
+    if languages.same(src, tgt):
         return []
+    src, tgt = languages.model_code(src), languages.model_code(tgt)
     pairs = set(available_pairs(index))
     if (src, tgt) in pairs:
         return [(src, tgt)]
@@ -93,8 +105,9 @@ def plan(src, tgt, index=None):
 
 def installed_plan(src, tgt):
     """Offline: how to translate src->tgt with what is installed now (list of steps) or None."""
-    if src == tgt:
+    if languages.same(src, tgt):
         return []
+    src, tgt = languages.model_code(src), languages.model_code(tgt)
     if is_installed(src, tgt):
         return [(src, tgt)]
     if src != PIVOT and tgt != PIVOT and is_installed(src, PIVOT) and is_installed(PIVOT, tgt):
@@ -158,7 +171,7 @@ def _download_and_unpack(url, tmp, dest, progress):
 def support(src, tgt, index=None):
     """Can src->tgt be translated? {"known","supported","installed","steps","download"}.
     known=False means the index could not be read and nothing installed covers the pair (answer unknown)."""
-    if src == tgt:
+    if languages.same(src, tgt):
         return {"known": True, "supported": True, "installed": True, "steps": [], "download": []}
     steps = installed_plan(src, tgt)
     if steps is not None:

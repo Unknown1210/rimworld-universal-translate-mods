@@ -36,7 +36,8 @@ namespace AutoTranslate
         /// <summary>Installed models are pairs like "en>pt". A pair works if installed directly or via English.</summary>
         public bool HasPair(string src, string tgt)
         {
-            if (src == tgt) return true;
+            if (LangMap.Same(src, tgt)) return true;
+            src = LangMap.ModelCode(src); tgt = LangMap.ModelCode(tgt);      // pt-BR is the "pb" model
             return Installed.Contains(src + ">" + tgt) || (Installed.Contains(src + ">en") && Installed.Contains("en>" + tgt));
         }
     }

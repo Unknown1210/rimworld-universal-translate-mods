@@ -89,6 +89,43 @@ class Bulk(unittest.TestCase):
     def setUp(self):
         CALLS.clear()
 
+    def test_clear_translations_keeps_overrides(self):
+        from rwtranslate.paths import data_dir
+        bulk.write_cache("zz", "m.one", {"a": "b"})
+        bulk.write_cache("zz", "m.two", {"c": "d"})
+        keep = data_dir() / "overrides" / "zz.json"
+        keep.parent.mkdir(parents=True, exist_ok=True)
+        keep.write_text("{}")
+        st = bulk.state_load()
+        st["zz"] = {"m.one": {"fingerprint": "x"}}
+        bulk.state_save(st)
+        try:
+            self.assertEqual(bulk.clear_translations("zz"), 2)
+            self.assertEqual(bulk.read_cache("zz", "m.one"), {})
+            self.assertNotIn("zz", bulk.state_load())
+            self.assertTrue(keep.exists(), "the player's manual corrections are kept")
+            self.assertEqual(bulk.clear_translations("zz"), 0, "nothing left: no error")
+        finally:
+            keep.unlink(missing_ok=True)
+
+    def test_folder_list_default_then_added(self):
+        from rwtranslate import config
+        old = config.get("mods_dirs")
+        gone = self.root / "does-not-exist"
+        try:
+            config.set("mods_dirs", [str(self.root), str(gone)])
+            rows = bulk.dir_entries()
+            kinds = {str(d): (k, ok) for d, k, ok in rows}
+            self.assertEqual(kinds[str(self.root)], ("added", True))
+            self.assertEqual(kinds[str(gone)], ("added", False), "an added folder that is missing is still listed")
+            self.assertTrue(all(k == "default" for _d, k, _ok in rows[:len(rows) - 2]), "default folders come first")
+            self.assertIn(self.root, bulk.mods_dirs())
+            self.assertNotIn(gone, bulk.mods_dirs(), "missing folders are not scanned")
+            config.set("mods_dirs", [str(self.root), str(self.root)])
+            self.assertEqual(len([1 for d, _k, _ok in bulk.dir_entries() if str(d) == str(self.root)]), 1, "no duplicates")
+        finally:
+            config.set("mods_dirs", old)
+
     def test_01_translates_everything_that_needs_it(self):
         events = []
         res = {x.package_id: x for x in bulk.run("pt", self.dirs, progress=events.append)}

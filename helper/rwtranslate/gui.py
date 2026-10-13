@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import webbrowser
+from pathlib import Path
 
 from . import __version__, bulk, config, diagnostics, i18n, languages, logsetup, models, server, updater
 from .paths import logs_dir
@@ -18,7 +19,7 @@ from .paths import logs_dir
 log = logsetup.get("gui")
 ISSUES_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods/issues/new?labels=bug"
 UI_NAMES = {"pt": "Português", "en": "English"}
-COMMON_TARGETS = i18n.COMMON15
+SUPPORTED_TARGETS = i18n.SUPPORTED_TARGETS
 
 
 def open_folder(path):
@@ -153,7 +154,7 @@ class App:
         self.btn_model = ttk.Button(row, command=self.install_model)
         self.btn_model.grid(row=0, column=2)
         self.target_msg = self.field(content, 4, pady=(0, 6), color="#2a7a2a")
-        self.set_lang_choices(COMMON_TARGETS)
+        self.set_lang_choices(SUPPORTED_TARGETS)
 
         ttk.Separator(content).grid(row=5, column=0, sticky="ew", pady=8)
         self.update_msg = self.field(content, 6)
@@ -175,7 +176,12 @@ class App:
         b.columnconfigure(0, weight=1)
         b.rowconfigure(7, weight=1)
         self.bulk_intro = self.field(b, 0, pady=(0, 6))
-        self.bulk_dirs = self.field(b, 1, pady=(0, 6), color="#666666")
+        self.dirs_frame = ttk.LabelFrame(b, padding=6)
+        self.dirs_frame.grid(row=1, column=0, sticky="ew", pady=(0, 6))
+        self.dirs_frame.columnconfigure(0, weight=1)
+        self.lbl_dirs = ttk.Label(self.dirs_frame, anchor="w", justify="left")
+        self.lbl_dirs.grid(row=0, column=0, sticky="ew")
+        self.dir_rows = []
         btns = ttk.Frame(b)
         btns.grid(row=2, column=0, sticky="ew", pady=3)
         self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
@@ -183,7 +189,8 @@ class App:
         self.btn_bulk = ttk.Button(btns, command=lambda: self.start_bulk(False), state="disabled")
         self.btn_bulk_all = ttk.Button(btns, command=lambda: self.start_bulk(True))
         self.btn_stop = ttk.Button(btns, command=self.stop_bulk, state="disabled")
-        self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop])
+        self.btn_clear = ttk.Button(btns, command=self.clear_translations)
+        self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop, self.btn_clear])
         self.pbar = ttk.Progressbar(b, orient="horizontal", mode="determinate", maximum=100)
         self.pbar.grid(row=3, column=0, sticky="ew", pady=(8, 2))
         self.bulk_progress = self.field(b, 4, pady=(0, 0))
@@ -193,15 +200,20 @@ class App:
         tf.grid(row=7, column=0, sticky="nsew")
         tf.columnconfigure(0, weight=1)
         tf.rowconfigure(0, weight=1)
-        cols = ("mod", "source", "texts", "words", "state")
+        cols = ("mod", "source", "texts", "words", "state", "folder")
         self.tree = ttk.Treeview(tf, columns=cols, show="headings", height=8)
-        for c, w, a in (("mod", 230, "w"), ("source", 90, "center"), ("texts", 60, "e"), ("words", 70, "e"), ("state", 210, "w")):
+        # everything centred in its column, except the mod name (left); the last column opens the mod's folder when clicked
+        for c, w, a in (("mod", 230, "w"), ("source", 80, "center"), ("texts", 70, "center"), ("words", 80, "center"),
+                        ("state", 190, "center"), ("folder", 110, "center")):
             self.tree.column(c, width=w, anchor=a, stretch=(c in ("mod", "state")))
         self.tree.grid(row=0, column=0, sticky="nsew")
         sb = ttk.Scrollbar(tf, orient="vertical", command=self.tree.yview)
         sb.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=sb.set)
         self.tree.bind("<Double-1>", self.on_tree_double)
+        self.tree.bind("<Button-1>", self.on_tree_click)
+        self.tree.bind("<Motion>", self.on_tree_motion)
+        self.row_mods = {}
         self.bulk_hint = self.field(b, 8, pady=(4, 0), color="#666666")
 
     def on_resize(self, event):
@@ -211,6 +223,7 @@ class App:
         for f in self.fields:
             f.label.configure(wraplength=wrap)
         self.lbl_keep.configure(wraplength=wrap)
+        self.lbl_dirs.configure(wraplength=wrap - 20)
 
     # ------------------------------------------------------------------ language of the window
     def t(self, key, **kw):
@@ -236,14 +249,18 @@ class App:
         self.btn_scan.configure(text=t("bulk_scan"))
         self.btn_bulk_all.configure(text=t("bulk_start_all"))
         self.btn_stop.configure(text=t("bulk_stop"))
+        self.btn_clear.configure(text=t("bulk_clear"))
         self.bulk_hint.set_key("det_hint")
         self.update_bulk_buttons()
-        for col, key in (("mod", "col_mod"), ("source", "col_source"), ("texts", "col_texts"), ("words", "col_words"), ("state", "col_state")):
-            self.tree.heading(col, text=t(key))
+        self.render_dirs()
+        for col, key in (("mod", "col_mod"), ("source", "col_source"), ("texts", "col_texts"), ("words", "col_words"),
+                         ("state", "col_state"), ("folder", "col_folder")):
+            self.tree.heading(col, text=t(key), anchor="center")
         for f in self.fields:
             f.render()
-        self.set_lang_choices(list(self.lang_codes.values()) or COMMON_TARGETS)
+        self.set_lang_choices(list(self.lang_codes.values()) or SUPPORTED_TARGETS)
         self.render_rows()
+        self.refresh_details_windows()
 
     def on_ui_lang(self, _event=None):
         name = self.ui_box.get()
@@ -289,7 +306,7 @@ class App:
 
     def set_lang_choices(self, codes):
         """Full names in the window language; the saved target (or a suggestion) stays selected."""
-        keep = self.selected_target() or config.get("target") or languages.suggest()
+        keep = languages.norm_target(self.selected_target() or config.get("target") or languages.suggest())   # old settings say "pt"
         shown = {c for c in codes if c in i18n.NAMES}             # only languages that have a full name: never a bare code
         if keep in i18n.NAMES:
             shown.add(keep)
@@ -429,6 +446,25 @@ class App:
     def dirs(self):
         return self.mod_dirs_override if self.mod_dirs_override is not None else bulk.mods_dirs()
 
+    def load_dir_rows(self):
+        if self.mod_dirs_override is not None:
+            self.dir_rows = [(Path(d), "added", Path(d).is_dir()) for d in self.mod_dirs_override]
+        else:
+            self.dir_rows = bulk.dir_entries()
+
+    def render_dirs(self):
+        """List of every folder searched, numbered, in the window language (called again when the language changes)."""
+        t = self.t
+        self.dirs_frame.configure(text=t("bulk_dirs_title"))
+        if not self.dir_rows:
+            self.lbl_dirs.configure(text=t("bulk_nodirs"))
+            return
+        lines = []
+        for i, (d, kind, exists) in enumerate(self.dir_rows, 1):
+            tag = t("dir_missing") if not exists else t("dir_default" if kind == "default" else "dir_added")
+            lines.append(f"{i}. {d}   [{tag}]")
+        self.lbl_dirs.configure(text="\n".join(lines))
+
     def add_dir(self):
         from tkinter import filedialog
         d = filedialog.askdirectory(parent=self.root)
@@ -437,6 +473,28 @@ class App:
             if d not in cur:
                 config.set("mods_dirs", cur + [d])
             self.refresh_plan()
+
+    def ask_yes_no(self, title, text):
+        from tkinter import messagebox
+        return messagebox.askyesno(title, text, parent=self.root, icon="warning", default="no")
+
+    def clear_translations(self):
+        """Delete every saved translation of the chosen language (after asking), then list the mods as new again."""
+        tgt = self.selected_target()
+        if not tgt or self.bulk_running:
+            return
+        label = i18n.lang_label(tgt, self.lang)
+        if not self.ask_yes_no(self.t("bulk_clear_title"), self.t("bulk_clear_confirm", lang=label)):
+            return
+        try:
+            n = bulk.clear_translations(tgt)
+        except Exception as e:  # noqa: BLE001
+            log.exception("clearing translations failed")
+            self.bulk_summary.set_key("bulk_error", err=e)
+            return
+        self.pbar["value"] = 0
+        self.refresh_plan()
+        self.bulk_progress.set_key("bulk_cleared", n=n, lang=label)
 
     def update_bulk_buttons(self):
         pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
@@ -447,6 +505,7 @@ class App:
         self.btn_scan.configure(state="normal" if idle else "disabled")
         self.btn_add_dir.configure(state="normal" if idle else "disabled")
         self.btn_stop.configure(state="disabled" if idle else "normal")
+        self.btn_clear.configure(state="normal" if idle and self.selected_target() else "disabled")
 
     def refresh_plan(self):
         """Scan the mod folders and compare with what was translated before (new / changed / ok)."""
@@ -454,11 +513,9 @@ class App:
             return
         tgt = self.selected_target()
         self.bulk_intro.set_key("bulk_intro")
-        dirs = self.dirs()
-        if dirs:
-            self.bulk_dirs.set("")
-        else:
-            self.bulk_dirs.set_key("bulk_nodirs")
+        self.load_dir_rows()
+        self.render_dirs()
+        dirs = [d for d, _k, ok in self.dir_rows if ok]
         if not tgt:
             self.plan_rows = []
             self.render_rows()                       # (this rewrites the summary line, so the hint must come after it)
@@ -504,10 +561,13 @@ class App:
     def render_rows(self):
         self.tree.delete(*self.tree.get_children())
         self.rows = {}
+        self.row_mods = {}
         texts = words = 0
         for mod, status, saved in sorted(self.plan_rows, key=lambda r: r[0].name.lower()):
             vals = self._row_values(mod, status, saved)
-            self.rows[mod.package_id] = self.tree.insert("", "end", values=vals)
+            iid = self.tree.insert("", "end", values=vals + (self.t("folder_open"),))
+            self.rows[mod.package_id] = iid
+            self.row_mods[iid] = mod
             texts += vals[2]
             words += vals[3]
         pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
@@ -586,7 +646,25 @@ class App:
         self.refresh_plan()
 
     # ------------------------------------------------------------------ details of one mod (double-click)
+    FOLDER_COL = "#6"                                     # the "folder" column (columns are numbered from 1)
+
+    def on_tree_click(self, event):
+        """A click on the folder column of a mod opens that mod's folder in the file explorer."""
+        if self.tree.identify_region(event.x, event.y) != "cell" or self.tree.identify_column(event.x) != self.FOLDER_COL:
+            return
+        mod = self.row_mods.get(self.tree.identify_row(event.y))
+        if mod is not None:
+            open_folder(str(mod.path))
+            return "break"                                # do not also select the row
+
+    def on_tree_motion(self, event):
+        over = self.tree.identify_region(event.x, event.y) == "cell" and self.tree.identify_column(event.x) == self.FOLDER_COL \
+            and self.tree.identify_row(event.y) in self.row_mods
+        self.tree.configure(cursor="hand2" if over else "")
+
     def on_tree_double(self, event):
+        if self.tree.identify_column(event.x) == self.FOLDER_COL:
+            return                                        # the click already opened the folder; the details window is for the other columns
         iid = self.tree.identify_row(event.y)
         for pid, row in self.rows.items():
             if row == iid:
@@ -594,24 +672,61 @@ class App:
                 return
 
     def show_details(self, package_id):
-        """Window with what was translated for one mod, and why the other texts were left alone."""
-        tk, ttk, t = self.tk, self.ttk, self.t
-        entry = next(((m, s, r) for m, s, r in self.plan_rows if m.package_id == package_id), None)
-        tgt = self.selected_target()
-        if entry is None or not tgt:
+        """Window with what was translated for one mod, and why the other texts were left alone.
+        It follows the window language: changing the language in the main window rebuilds every open details window."""
+        tk, ttk = self.tk, self.ttk
+        if self._details_entry(package_id) is None or not self.selected_target():
             return None
-        mod, _status, saved = entry
-        saved = saved or {}
-        cache = bulk.read_cache(tgt, package_id)
-        skipped = saved.get("skipped", [])
         top = tk.Toplevel(self.root)
-        top.title(t("det_title", name=mod.name))
         top.geometry("860x600")
         top.minsize(640, 420)
-        self.details_windows = getattr(self, "details_windows", [])
-        self.details_windows.append(top)
         top.columnconfigure(0, weight=1)
         top.rowconfigure(1, weight=1)
+        top.package_id = package_id
+        top.rebuild = lambda: self._fill_details(top)
+        self.details_windows = getattr(self, "details_windows", [])
+        self.details_windows.append(top)
+        self._fill_details(top)
+        return top
+
+    def _details_entry(self, package_id):
+        return next(((m, s, r) for m, s, r in self.plan_rows if m.package_id == package_id), None)
+
+    def refresh_details_windows(self):
+        """Redraw the open details windows in the current window language (selection and tab are kept)."""
+        alive = []
+        for top in getattr(self, "details_windows", []):
+            try:
+                if not top.winfo_exists():
+                    continue
+                top.rebuild()
+                alive.append(top)
+            except Exception:  # noqa: BLE001 - a window that cannot be redrawn must not break the language change
+                log.exception("could not redraw a details window")
+        self.details_windows = alive
+
+    def _fill_details(self, top):
+        tk, ttk, t = self.tk, self.ttk, self.t
+        keep_tab, keep_sel = 0, None
+        old = getattr(top, "details", None)
+        if old:
+            try:
+                keep_tab = old["nb"].index(old["nb"].select())
+                keep_sel = (keep_tab, old["tabs"][keep_tab].index(old["tabs"][keep_tab].selection()[0]))
+            except Exception:  # noqa: BLE001 - nothing selected
+                pass
+        for child in top.winfo_children():
+            child.destroy()
+        entry = self._details_entry(top.package_id)
+        tgt = self.selected_target()
+        if entry is None or not tgt:
+            top.destroy()
+            return
+        mod, _status, saved = entry
+        saved = saved or {}
+        cache = bulk.read_cache(tgt, top.package_id)
+        skipped = saved.get("skipped", [])
+        top.title(t("det_title", name=mod.name))
         head = ttk.Label(top, anchor="w", justify="left", wraplength=800, padding=8,
                          text=t("det_summary", texts=saved.get("texts", 0), translated=saved.get("translated", 0), cached=saved.get("from_cache", 0),
                                 words=saved.get("words", 0), covered=saved.get("covered", 0), already=saved.get("already_target", 0),
@@ -654,16 +769,17 @@ class App:
         txt.grid(row=0, column=0, sticky="ew")
         txt.configure(state="disabled")
 
-        def on_select(event):
-            tv = event.widget
-            sel = tv.selection()
-            if not sel:
-                return
-            o, tr = full.get(sel[0], ("", ""))
+        def show_full(tv, iid):
+            o, tr = full.get(iid, ("", ""))
             txt.configure(state="normal")
             txt.delete("1.0", "end")
             txt.insert("end", t("det_full_orig") + "\n" + o + ("\n\n" + t("det_full_trans") + "\n" + tr if tr else ""))
             txt.configure(state="disabled")
+
+        def on_select(event):
+            sel = event.widget.selection()
+            if sel:
+                show_full(event.widget, sel[0])
         tv1.bind("<<TreeviewSelect>>", on_select)
         tv2.bind("<<TreeviewSelect>>", on_select)
         if not done and not skipped:
@@ -671,8 +787,17 @@ class App:
             txt.insert("end", t("det_empty"))
             txt.configure(state="disabled")
         ttk.Button(top, text=t("det_close"), command=top.destroy).grid(row=3, column=0, pady=(0, 8))
-        top.details = {"translated": tv1, "skipped": tv2, "text": txt, "full": full}
-        return top
+        top.details = {"translated": tv1, "skipped": tv2, "text": txt, "full": full, "nb": nb, "tabs": [tv1, tv2]}
+        if keep_sel:                                           # same tab and same row as before the redraw
+            try:
+                nb.select(keep_sel[0])
+                tv = top.details["tabs"][keep_sel[0]]
+                iid = tv.get_children()[keep_sel[1]]
+                tv.selection_set(iid)
+                tv.see(iid)
+                show_full(tv, iid)
+            except Exception:  # noqa: BLE001 - the list got shorter
+                pass
 
     @staticmethod
     def _one_line(s, n=160):
@@ -704,6 +829,7 @@ def main():
     """Open the window with the server running. Raises ImportError/TclError if no window is possible."""
     import tkinter as tk
     root = tk.Tk()
+    config.migrate_portuguese()
     httpd = server.serve(server.DEFAULT_PORT)
     threading.Thread(target=httpd.serve_forever, daemon=True, name="http-server").start()
     App(root, httpd)

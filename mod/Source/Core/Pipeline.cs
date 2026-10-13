@@ -250,7 +250,7 @@ namespace AutoTranslate
                 {
                     Item it = kv.Value;
                     string lang = ms.SourceOverride ?? LangDetect.ScriptLang(it.Source) ?? ms.LatinLang;
-                    if (lang == Target) { ms.AlreadyTarget++; drop.Add(kv.Key); continue; }
+                    if (LangMap.Same(lang, Target)) { ms.AlreadyTarget++; drop.Add(kv.Key); continue; }
                     it.SourceLang = lang;
                     int n; ms.SourceCounts.TryGetValue(lang, out n); ms.SourceCounts[lang] = n + 1;
                 }
@@ -268,10 +268,10 @@ namespace AutoTranslate
             string known;
             if (original == null && cache != null && cache.TryGet(ms.Id, c.Value, out known)) return true;   // already translated as an ORIGINAL text before (e.g. by the helper's bulk run)
             string sl = LangDetect.ScriptLang(v);
-            if (sl != null) return sl != Target;
+            if (sl != null) return !LangMap.Same(sl, Target);
             bool conf; string det;
             string lat = LangDetect.LatinLang(new[] { v }, out conf, out det);
-            return conf && lat != Target;
+            return conf && !LangMap.Same(lat, Target);
         }
 
         /// <summary>The heart of the "only translate what has no support" rule, per string and per mode.</summary>
@@ -946,7 +946,7 @@ namespace AutoTranslate
         /// false = this pair cannot be used (no model exists, download failed); the result is remembered.</summary>
         static bool EnsurePair(string src, int gen)
         {
-            if (src == Target) return true;
+            if (LangMap.Same(src, Target)) return true;
             string key = src + ">" + Target;
             bool known;
             if (pairState.TryGetValue(key, out known)) return known;

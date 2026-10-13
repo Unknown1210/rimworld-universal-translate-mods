@@ -12,7 +12,11 @@ namespace UnityEngine
     public enum LogType { Error, Assert, Warning, Log, Exception }
     public enum SystemLanguage { English, Portuguese, Spanish }
     public enum RuntimePlatform { WindowsPlayer, LinuxPlayer }
-    public static class GUIUtility { public static string systemCopyBuffer { get; set; } }
+    public static class GUIUtility { public static string systemCopyBuffer { get; set; } public static int keyboardControl { get { return 0; } } }
+    public enum KeyCode { None, Tab, Escape, T, F1, LeftShift, RightShift, LeftControl, RightControl, LeftAlt, RightAlt }
+    public enum EventType { Layout, Repaint, KeyDown, Used }
+    public class Event { public static Event current; public EventType type; public KeyCode keyCode; public bool shift, control, alt; public void Use() { type = EventType.Used; } }
+    public static class Input { public static bool GetKeyDown(KeyCode k) { return false; } public static bool GetKey(KeyCode k) { return false; } }
     public static class Application
     {
         public delegate void LogCallback(string condition, string stackTrace, LogType type);
@@ -37,17 +41,22 @@ namespace HarmonyLib
     }
     public static class AccessTools
     {
+        public static MethodInfo Method(Type t, string name) { return t.GetMethod(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static); }
         public static FieldInfo Field(Type t, string name) { return t.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static); }
     }
 }
 
 namespace RimWorld
 {
+    public static class MessageTypeDefOf { public static Verse.MessageTypeDef SilentInput = new Verse.MessageTypeDef(); }
     public static class VersionControl { public static string CurrentVersionString { get { return "1.6"; } } }
 }
 
 namespace Verse
 {
+    public static class Translator { static string PseudoTranslated(string original) { return "~" + original + "~"; } }
+    public static class Messages { public static void Message(string text, MessageTypeDef def, bool historical) { } }
+    public class MessageTypeDef { }
     public static class Log { public static void Warning(string s) { } public static void Error(string s) { } }
     public class TaggedString
     {
