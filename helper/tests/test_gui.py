@@ -134,11 +134,11 @@ class Window(unittest.TestCase):
         pump(self.root, lambda: False, timeout=0.3)
         small = int(str(app.update_msg.label.cget("wraplength")))
         small_btn = app.btn_check.winfo_width()
-        self.root.geometry("1300x500")
+        self.root.geometry("960x500")
         pump(self.root, lambda: False, timeout=0.5)
         big = int(str(app.update_msg.label.cget("wraplength")))
-        self.assertGreater(big, small + 300, "text re-wraps to the new width")
-        self.assertGreater(app.btn_check.winfo_width(), small_btn + 100, "buttons stretch with the window")
+        self.assertGreater(big, small + 80, "text re-wraps to the new width")
+        self.assertGreater(app.btn_check.winfo_width(), small_btn + 40, "buttons stretch with the window")
 
     def test_language_picker_shows_full_names_in_the_window_language(self):
         app = self.build(fake_fetcher(release_json("v0.0")))

@@ -4,6 +4,12 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.006 - 2026-10-13
+- Corrigido: a v0.005 não gerou release (nem `.exe` nem zip): o teste da janela falhou no Windows do GitHub, porque pedia uma janela de 1300 px e a tela do servidor é menor, e a release só sai se os testes passam. O teste agora usa larguras que cabem na tela (820 a 960 px). Esta versão traz tudo o que estava na v0.005, que ficou sem arquivos para baixar.
+- Alterado: o README inteiro fica justificado, inclusive a tabela de compatibilidade (agora em HTML, com as células justificadas), e o título "Universal Translate for RimWorld" fica centralizado.
+- Adicionado: no README, linha divisória entre os itens de "Como funciona" (1 a 4), de "Instalação" (1 a 6) e do "Aviso do Windows" (os dois itens), para ler item a item.
+- Não validado ainda: como o GitHub mostra o README justificado, com a tabela em HTML e as linhas divisórias (conferido só em um conversor local de Markdown, que mantém as listas numeradas na sequência certa).
+
 ## v0.005 - 2026-10-13
 - Alterado: na lista de pastas pesquisadas (aba "Traduzir mods"), a marca "[padrão]" fica alinhada na borda direita da linha; as marcas "[adicionada por você]" e "[não encontrada]" continuam logo depois do caminho.
 - Alterado: o texto do README fica justificado (como no Word), com `align="justify"` em volta dos parágrafos e listas; título e tabela de compatibilidade ficam fora.
