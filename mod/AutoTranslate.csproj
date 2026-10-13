@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Without RimWorld installed (e.g. CI) the public Krafs.Rimworld.Ref package is used automatically.
+    Build:  dotnet build -c Release -p:RimWorldDir="C:\Program Files (x86)\Steam\steamapps\common\RimWorld"
+    Output: ../1.6/Assemblies/RimWorldAutoTranslate.dll   (the mod folder is this "mod" directory)
+    Linux:  -p:RimWorldDir="$HOME/.steam/steam/steamapps/common/RimWorld"
+  -->
+  <PropertyGroup>
+    <TargetFramework>net472</TargetFramework>
+    <AssemblyName>RimWorldAutoTranslate</AssemblyName>
+    <RootNamespace>AutoTranslate</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <Version>0.001.0</Version>
+    <OutputPath>1.6/Assemblies/</OutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <DebugType>portable</DebugType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RimWorldDir Condition="'$(RimWorldDir)' == ''">C:\Program Files (x86)\Steam\steamapps\common\RimWorld</RimWorldDir>
+    <ManagedDir>$(RimWorldDir)/RimWorldWin64_Data/Managed</ManagedDir>
+    <ManagedDir Condition="!Exists('$(ManagedDir)')">$(RimWorldDir)/RimWorldLinux_Data/Managed</ManagedDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Source/**/*.cs" />
+    <!-- English screen texts also live inside the DLL: if the Languages folder is ever missing the screen still reads well -->
+    <EmbeddedResource Include="Languages/English/Keyed/AutoTranslate.xml" LogicalName="AutoTranslate.English.xml" />
+  </ItemGroup>
+  <!-- Local game DLLs when RimWorldDir exists; otherwise the public reference package (used by CI). -->
+  <PropertyGroup>
+    <UseRefPackage Condition="!Exists('$(ManagedDir)/Assembly-CSharp.dll')">true</UseRefPackage>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(UseRefPackage)' != 'true'">
+    <Reference Include="Assembly-CSharp"><HintPath>$(ManagedDir)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(ManagedDir)/UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(ManagedDir)/UnityEngine.IMGUIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(ManagedDir)/UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup Condition="'$(UseRefPackage)' == 'true'">
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.6.4871" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Lib.Harmony.Ref" Version="2.3.3" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

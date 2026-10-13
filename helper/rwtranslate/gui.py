@@ -1,0 +1,710 @@
+"""Window of the packaged .exe, two tabs:
+  Home              - state of the helper, TARGET LANGUAGE (saved in config.json; the game mod follows it),
+                      updates, logs, problem report.
+  Translate all mods - translates every installed mod (even those not enabled in the game) with a progress bar,
+                      a per-mod table and a summary; finds new/changed mods later.
+Resizable: texts re-wrap and widgets stretch. Texts follow the system language (pt/en, see i18n).
+The translation server runs in a background thread. Falls back to the console when no window can be opened."""
+import os
+import queue
+import subprocess
+import sys
+import threading
+import webbrowser
+
+from . import __version__, bulk, config, diagnostics, i18n, languages, logsetup, models, server, updater
+from .paths import logs_dir
+
+log = logsetup.get("gui")
+ISSUES_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods/issues/new?labels=bug"
+UI_NAMES = {"pt": "Português", "en": "English"}
+COMMON_TARGETS = i18n.COMMON15
+
+
+def open_folder(path):
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(path))  # noqa: S606
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
+    except Exception:
+        log.exception("could not open folder %s", path)
+
+
+class Field:
+    """Text shown in a Label, remembered as (key, args) so it can be re-rendered when the window language changes.
+    Plain Python object on purpose: tkinter's StringVar must be finalised by the main thread, and objects captured by
+    worker threads can end up finalised there, which aborts the process on Windows
+    ("Tcl_AsyncDelete: async handler deleted by the wrong thread"). Call from the main thread only."""
+
+    def __init__(self, label, app):
+        self.label, self.app = label, app
+        self.value, self._key, self._kw = "", None, {}
+
+    def set(self, text):
+        self._key = None
+        self.value = text
+        self.label.configure(text=text)
+
+    def set_key(self, key, **kw):
+        self._key, self._kw = key, kw
+        self.render()
+
+    def render(self):
+        if self._key is not None:
+            self.value = self.app.t(self._key, **self._kw)
+            self.label.configure(text=self.value)
+
+    def get(self):
+        return self.value
+
+
+class App:
+    def __init__(self, root, httpd, fetcher=updater.fetch, exe_path=None, mod_dir=None, restart=None, lang=None, mod_dirs=None):
+        import tkinter as tk
+        from tkinter import ttk
+        self.tk, self.ttk = tk, ttk
+        self.root, self.httpd, self.fetcher = root, httpd, fetcher
+        self.exe_path, self.mod_dir_override = exe_path, mod_dir
+        self.mod_dirs_override = mod_dirs                  # tests; None = detect Steam folders
+        self.restart_fn = restart or self._restart
+        self.lang = lang or i18n.current()
+        self.q = queue.Queue()
+        self.latest = None
+        self.busy = False
+        self.fields, self.static = [], []
+        self.lang_codes = {}
+        self.cancel = None
+        self.bulk_running = False
+        self.rows = {}
+        self.plan_rows = []
+        root.geometry("780x640")
+        root.minsize(620, 520)
+        root.protocol("WM_DELETE_WINDOW", self.quit)
+
+        outer = ttk.Frame(root, padding=12)
+        outer.pack(fill="both", expand=True)
+        outer.columnconfigure(0, weight=1)
+        outer.rowconfigure(1, weight=1)
+        self.outer = outer
+        bar = ttk.Frame(outer)
+        bar.grid(row=0, column=0, sticky="ew")
+        bar.columnconfigure(0, weight=1)
+        self.lbl_ui = ttk.Label(bar)
+        self.lbl_ui.grid(row=0, column=1, padx=(0, 6))
+        self.ui_box = ttk.Combobox(bar, width=10, state="readonly", values=[UI_NAMES[c] for c in i18n.UI_LANGS])
+        self.ui_box.set(UI_NAMES[self.lang])
+        self.ui_box.grid(row=0, column=2)
+        self.ui_box.bind("<<ComboboxSelected>>", self.on_ui_lang)
+
+        self.nb = ttk.Notebook(outer)
+        self.nb.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+        self.home = ttk.Frame(self.nb, padding=10)
+        self.bulk_tab = ttk.Frame(self.nb, padding=10)
+        self.nb.add(self.home, text="")
+        self.nb.add(self.bulk_tab, text="")
+        self.build_home()
+        self.build_bulk()
+
+        root.bind("<Configure>", self.on_resize)
+        self.apply_language()
+        self.refresh_status()
+        self._pump_id = self.root.after(100, self.pump)
+        self.start_check()
+        self.refresh_plan()
+
+    # ------------------------------------------------------------------ construction
+    def field(self, parent, row, pady=(0, 2), color=None, sticky="ew"):
+        lbl = self.ttk.Label(parent, anchor="center", justify="center", foreground=color or "")
+        lbl.grid(row=row, column=0, sticky=sticky, pady=pady)
+        f = Field(lbl, self)
+        self.fields.append(f)
+        return f
+
+    def stretch(self, frame, buttons):
+        for i, b in enumerate(buttons):
+            frame.columnconfigure(i, weight=1, uniform="btn")
+            b.grid(row=0, column=i, sticky="ew", padx=3)
+
+    def build_home(self):
+        ttk, h = self.ttk, self.home
+        h.columnconfigure(0, weight=1)
+        h.rowconfigure(0, weight=1)
+        h.rowconfigure(2, weight=1)
+        content = ttk.Frame(h)
+        content.grid(row=1, column=0, sticky="ew")
+        content.columnconfigure(0, weight=1)
+        self.content = content
+        self.lbl_keep = ttk.Label(content, font=("TkDefaultFont", 11, "bold"), anchor="center", justify="center")
+        self.lbl_keep.grid(row=0, column=0, sticky="ew", pady=(0, 6))
+        self.status = self.field(content, 1)
+        self.status2 = self.field(content, 2, pady=(0, 8))
+
+        # target language: the single place to choose it; the game mod reads config.json
+        row = ttk.Frame(content)
+        row.grid(row=3, column=0, pady=(0, 2))
+        self.lbl_target = ttk.Label(row)
+        self.lbl_target.grid(row=0, column=0, padx=(0, 6))
+        self.lang_box = ttk.Combobox(row, width=26, state="readonly")
+        self.lang_box.grid(row=0, column=1, padx=(0, 6))
+        self.lang_box.bind("<<ComboboxSelected>>", self.on_target_selected)
+        self.btn_model = ttk.Button(row, command=self.install_model)
+        self.btn_model.grid(row=0, column=2)
+        self.target_msg = self.field(content, 4, pady=(0, 6), color="#2a7a2a")
+        self.set_lang_choices(COMMON_TARGETS)
+
+        ttk.Separator(content).grid(row=5, column=0, sticky="ew", pady=8)
+        self.update_msg = self.field(content, 6)
+        self.progress = self.field(content, 7, pady=(0, 8), color="#666666")
+        row1 = ttk.Frame(content)
+        row1.grid(row=8, column=0, sticky="ew", pady=3)
+        self.btn_check = ttk.Button(row1, command=self.start_check)
+        self.btn_apply = ttk.Button(row1, command=self.start_update, state="disabled")
+        self.stretch(row1, [self.btn_check, self.btn_apply])
+        row2 = ttk.Frame(content)
+        row2.grid(row=9, column=0, sticky="ew", pady=3)
+        self.btn_logs = ttk.Button(row2, command=lambda: open_folder(logs_dir()))
+        self.btn_report = ttk.Button(row2, command=self.report)
+        self.btn_quit = ttk.Button(row2, command=self.quit)
+        self.stretch(row2, [self.btn_logs, self.btn_report, self.btn_quit])
+
+    def build_bulk(self):
+        ttk, b = self.ttk, self.bulk_tab
+        b.columnconfigure(0, weight=1)
+        b.rowconfigure(7, weight=1)
+        self.bulk_intro = self.field(b, 0, pady=(0, 6))
+        self.bulk_dirs = self.field(b, 1, pady=(0, 6), color="#666666")
+        btns = ttk.Frame(b)
+        btns.grid(row=2, column=0, sticky="ew", pady=3)
+        self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
+        self.btn_scan = ttk.Button(btns, command=self.refresh_plan)
+        self.btn_bulk = ttk.Button(btns, command=lambda: self.start_bulk(False), state="disabled")
+        self.btn_bulk_all = ttk.Button(btns, command=lambda: self.start_bulk(True))
+        self.btn_stop = ttk.Button(btns, command=self.stop_bulk, state="disabled")
+        self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop])
+        self.pbar = ttk.Progressbar(b, orient="horizontal", mode="determinate", maximum=100)
+        self.pbar.grid(row=3, column=0, sticky="ew", pady=(8, 2))
+        self.bulk_progress = self.field(b, 4, pady=(0, 0))
+        self.bulk_current = self.field(b, 5, pady=(0, 4), color="#666666")
+        self.bulk_summary = self.field(b, 6, pady=(0, 6))
+        tf = ttk.Frame(b)
+        tf.grid(row=7, column=0, sticky="nsew")
+        tf.columnconfigure(0, weight=1)
+        tf.rowconfigure(0, weight=1)
+        cols = ("mod", "source", "texts", "words", "state")
+        self.tree = ttk.Treeview(tf, columns=cols, show="headings", height=8)
+        for c, w, a in (("mod", 230, "w"), ("source", 90, "center"), ("texts", 60, "e"), ("words", 70, "e"), ("state", 210, "w")):
+            self.tree.column(c, width=w, anchor=a, stretch=(c in ("mod", "state")))
+        self.tree.grid(row=0, column=0, sticky="nsew")
+        sb = ttk.Scrollbar(tf, orient="vertical", command=self.tree.yview)
+        sb.grid(row=0, column=1, sticky="ns")
+        self.tree.configure(yscrollcommand=sb.set)
+        self.tree.bind("<Double-1>", self.on_tree_double)
+        self.bulk_hint = self.field(b, 8, pady=(4, 0), color="#666666")
+
+    def on_resize(self, event):
+        if event.widget is not self.root:
+            return
+        wrap = max(200, event.width - 90)
+        for f in self.fields:
+            f.label.configure(wraplength=wrap)
+        self.lbl_keep.configure(wraplength=wrap)
+
+    # ------------------------------------------------------------------ language of the window
+    def t(self, key, **kw):
+        if key == "title":
+            kw.setdefault("v", __version__)
+        return i18n.tr(self.lang, key, **kw)
+
+    def apply_language(self):
+        t = self.t
+        self.root.title(t("title"))
+        self.nb.tab(self.home, text=t("tab_home"))
+        self.nb.tab(self.bulk_tab, text=t("tab_bulk"))
+        self.lbl_keep.configure(text=t("keep_open"))
+        self.lbl_ui.configure(text=t("ui_lang"))
+        self.lbl_target.configure(text=t("target_lang"))
+        self.btn_model.configure(text=t("download_model"))
+        self.btn_check.configure(text=t("check_btn"))
+        self.btn_apply.configure(text=t("apply_btn"))
+        self.btn_logs.configure(text=t("logs_btn"))
+        self.btn_report.configure(text=t("report_btn"))
+        self.btn_quit.configure(text=t("quit_btn"))
+        self.btn_add_dir.configure(text=t("bulk_add_dir"))
+        self.btn_scan.configure(text=t("bulk_scan"))
+        self.btn_bulk_all.configure(text=t("bulk_start_all"))
+        self.btn_stop.configure(text=t("bulk_stop"))
+        self.bulk_hint.set_key("det_hint")
+        self.update_bulk_buttons()
+        for col, key in (("mod", "col_mod"), ("source", "col_source"), ("texts", "col_texts"), ("words", "col_words"), ("state", "col_state")):
+            self.tree.heading(col, text=t(key))
+        for f in self.fields:
+            f.render()
+        self.set_lang_choices(list(self.lang_codes.values()) or COMMON_TARGETS)
+        self.render_rows()
+
+    def on_ui_lang(self, _event=None):
+        name = self.ui_box.get()
+        code = next((c for c, n in UI_NAMES.items() if n == name), self.lang)
+        self.set_lang(code)
+
+    def set_lang(self, code):
+        self.lang = code
+        i18n.save_choice(code)
+        self.ui_box.set(UI_NAMES.get(code, code))
+        self.apply_language()
+
+    # ------------------------------------------------------------------ thread -> UI plumbing
+    def post(self, fn):
+        self.q.put(fn)
+
+    def pump(self):
+        try:
+            while True:
+                self.q.get_nowait()()
+        except queue.Empty:
+            pass
+        self._pump_id = self.root.after(100, self.pump)
+
+    def run_bg(self, work, done):
+        def target():
+            try:
+                res = work()
+                self.post(lambda: done(res, None))
+            except Exception as e:  # noqa: BLE001
+                log.exception("background action failed")
+                err = e                      # `e` is deleted when the except block ends; the queued callback needs its own reference
+                self.post(lambda err=err: done(None, err))
+        threading.Thread(target=target, daemon=True).start()
+
+    # ------------------------------------------------------------------ Home: status and target language
+    def refresh_status(self):
+        port = self.httpd.server_address[1]
+        pairs = models.installed_pairs()
+        self.status.set_key("running", port=port)
+        self.status2.set_key("models", models=", ".join(pairs) or self.t("none"))
+        self.refresh_target_info()
+
+    def set_lang_choices(self, codes):
+        """Full names in the window language; the saved target (or a suggestion) stays selected."""
+        keep = self.selected_target() or config.get("target") or languages.suggest()
+        shown = {c for c in codes if c in i18n.NAMES}             # only languages that have a full name: never a bare code
+        if keep in i18n.NAMES:
+            shown.add(keep)
+        choices = i18n.lang_choices(shown, self.lang)
+        self.lang_codes = {label: code for label, code in choices}
+        self.lang_box.configure(values=[label for label, _ in choices])
+        label = next((l for l, c in choices if c == keep), "")
+        self.lang_box.set(label)
+
+    def selected_target(self):
+        return self.lang_codes.get(self.lang_box.get()) if self.lang_codes else None
+
+    def refresh_target_info(self):
+        tgt = self.selected_target()
+        if not tgt:
+            self.target_msg.set_key("target_none")
+            self.btn_model.grid_remove()
+            return
+        if config.get("target") != tgt:
+            config.set("target", tgt)                       # the game mod reads this file
+        label = i18n.lang_label(tgt, self.lang)
+        ready = models.is_installed("en", tgt) or tgt == "en"
+        if ready:
+            self.target_msg.set_key("target_saved", lang=label)
+            self.btn_model.grid_remove()
+        else:
+            self.target_msg.set_key("model_missing", lang=label)
+            self.btn_model.grid()
+
+    def on_target_selected(self, _event=None):
+        tgt = self.selected_target()
+        if not tgt:
+            return
+        config.set("target", tgt)
+        log.info("target language set to %s in the helper window", tgt)
+        self.refresh_target_info()
+        self.refresh_plan()
+        if not (models.is_installed("en", tgt) or tgt == "en"):
+            self.install_model()
+
+    def install_model(self):
+        lang = self.selected_target()
+        if not lang or lang == "en":
+            return
+        self.btn_model.configure(state="disabled")
+        self.progress.set_key("downloading", lang=i18n.lang_label(lang, self.lang))
+        self.run_bg(lambda: models.install("en", lang, progress=lambda m: None), self._model_done)
+
+    def _model_done(self, _res, err):
+        self.btn_model.configure(state="normal")
+        if err:
+            self.progress.set_key("model_failed", err=err)
+        else:
+            self.progress.set_key("model_ok")
+        self.refresh_status()
+
+    # ------------------------------------------------------------------ Home: updates
+    def start_check(self):
+        if self.busy:
+            return
+        self.update_msg.set_key("checking")
+        self.btn_check.configure(state="disabled")
+        self.run_bg(lambda: updater.check(self.fetcher), self._check_done)
+
+    def _check_done(self, chk, err):
+        self.btn_check.configure(state="normal")
+        if err or chk is None:
+            self.update_msg.set_key("check_failed", err=err)
+            return
+        if chk.error:
+            self.update_msg.set(chk.error)
+        elif chk.available:
+            self.latest = chk.release
+            self.update_msg.set(self.t("new_version", latest=chk.latest, current=chk.current) + "\n" + self._short(chk.notes))
+            self.btn_apply.configure(state="normal")
+        else:
+            self.update_msg.set_key("up_to_date", current=chk.current)
+
+    @staticmethod
+    def _short(notes, n=300):
+        notes = (notes or "").strip().split("### Como instalar")[0].strip()
+        return notes if len(notes) <= n else notes[:n] + "..."
+
+    def start_update(self):
+        if self.busy or self.latest is None:
+            return
+        self.busy = True
+        self.btn_apply.configure(state="disabled")
+        self.btn_check.configure(state="disabled")
+        rel = self.latest
+        t = self.t
+
+        def work():
+            msgs = []
+            prog = lambda m: self.post(lambda: self.progress.set(m))
+            exe = updater.update_helper(rel, self.fetcher, prog, exe_path=self.exe_path) if (updater.is_frozen() or self.exe_path) else None
+            msgs.append(t("py_update") if exe is None else t("helper_updated"))
+            mod = self.mod_dir_override or updater.find_mod_dir()
+            try:
+                if mod:
+                    n = updater.update_mod(rel, mod, self.fetcher, prog)
+                    msgs.append(t("mod_updated", n=n, path=mod))
+                else:
+                    p = updater.save_mod_zip(rel, self.fetcher, prog)
+                    msgs.append(t("mod_zip_saved", path=p))
+            except updater.UpdateError as e:
+                msgs.append(t("mod_not_updated", err=e))
+            return exe, msgs
+
+        self.run_bg(work, self._update_done)
+
+    def _update_done(self, res, err):
+        self.busy = False
+        self.btn_check.configure(state="normal")
+        if err:
+            self.update_msg.set_key("update_failed", err=err)
+            self.progress.set("")
+            self.btn_apply.configure(state="normal")
+            return
+        exe, msgs = res
+        self.update_msg.set("\n".join(msgs))
+        if exe:
+            self.progress.set_key("restarting")
+            self.root.after(1200, lambda: self.quit(restart_exe=exe))
+
+    def report(self):
+        try:
+            z = diagnostics.make_bundle()
+            open_folder(z.parent)
+            webbrowser.open(ISSUES_URL)
+            self.progress.set_key("report_saved", name=z.name)
+        except Exception as e:  # noqa: BLE001
+            log.exception("report failed")
+            self.progress.set_key("report_failed", err=e)
+
+    # ------------------------------------------------------------------ Translate all mods
+    def dirs(self):
+        return self.mod_dirs_override if self.mod_dirs_override is not None else bulk.mods_dirs()
+
+    def add_dir(self):
+        from tkinter import filedialog
+        d = filedialog.askdirectory(parent=self.root)
+        if d:
+            cur = list(config.get("mods_dirs") or [])
+            if d not in cur:
+                config.set("mods_dirs", cur + [d])
+            self.refresh_plan()
+
+    def update_bulk_buttons(self):
+        pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
+        self.btn_bulk.configure(text=self.t("bulk_start_pending", n=pend))
+        idle = not self.bulk_running
+        self.btn_bulk.configure(state="normal" if idle and pend > 0 and self.selected_target() else "disabled")
+        self.btn_bulk_all.configure(state="normal" if idle and self.plan_rows and self.selected_target() else "disabled")
+        self.btn_scan.configure(state="normal" if idle else "disabled")
+        self.btn_add_dir.configure(state="normal" if idle else "disabled")
+        self.btn_stop.configure(state="disabled" if idle else "normal")
+
+    def refresh_plan(self):
+        """Scan the mod folders and compare with what was translated before (new / changed / ok)."""
+        if self.bulk_running:
+            return
+        tgt = self.selected_target()
+        self.bulk_intro.set_key("bulk_intro")
+        dirs = self.dirs()
+        if dirs:
+            self.bulk_dirs.set("")
+        else:
+            self.bulk_dirs.set_key("bulk_nodirs")
+        if not tgt:
+            self.plan_rows = []
+            self.render_rows()                       # (this rewrites the summary line, so the hint must come after it)
+            self.bulk_summary.set_key("bulk_need_target")
+            self.update_bulk_buttons()
+            return
+        self.bulk_current.set_key("bulk_scanning")
+        self.run_bg(lambda: bulk.plan(tgt, dirs), self._plan_done)
+
+    def _plan_done(self, rows, err):
+        self.bulk_current.set("")
+        if err:
+            self.bulk_summary.set_key("bulk_error", err=err)
+            return
+        self.plan_rows = rows or []
+        self.render_rows()
+        self.update_bulk_buttons()
+        if self.plan_rows and all(s == "ok" for _m, s, _r in self.plan_rows):
+            self.bulk_progress.set_key("bulk_all_ok")
+            self.pbar["value"] = 100
+
+    def _row_values(self, mod, status, saved, running=False):
+        t = self.t
+        if running:
+            state = t("st_running")
+        elif saved is None:
+            state = t("st_new")
+        elif status == "changed":
+            state = t("st_changed")
+        else:
+            state = t("st_ok")
+        texts = words = 0
+        src = ""
+        if saved:
+            texts, words = saved.get("texts", 0), saved.get("words", 0)
+            src = ", ".join(sorted(saved.get("langs", {})))
+            if saved.get("unsupported"):
+                state = t("st_nosupport", pairs=", ".join(saved["unsupported"]))
+            elif saved.get("failed"):
+                state += " - " + t("st_failed", n=saved["failed"])
+        return (mod.name, src, texts, words, state)
+
+    def render_rows(self):
+        self.tree.delete(*self.tree.get_children())
+        self.rows = {}
+        texts = words = 0
+        for mod, status, saved in sorted(self.plan_rows, key=lambda r: r[0].name.lower()):
+            vals = self._row_values(mod, status, saved)
+            self.rows[mod.package_id] = self.tree.insert("", "end", values=vals)
+            texts += vals[2]
+            words += vals[3]
+        pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
+        self.bulk_summary.set_key("bulk_summary", mods=len(self.plan_rows), pending=pend, texts=texts, words=words)
+
+    def start_bulk(self, force):
+        tgt = self.selected_target()
+        if not tgt:
+            self.bulk_summary.set_key("bulk_need_target")
+            return
+        if self.bulk_running:
+            return
+        self.bulk_running = True
+        self.cancel = threading.Event()
+        self.update_bulk_buttons()
+        self.pbar["value"] = 0
+        cancel, dirs = self.cancel, self.dirs()
+
+        def work():
+            return bulk.run(tgt, dirs, force=force, cancel=cancel,
+                            progress=lambda e: self.post(lambda e=e: self.on_bulk_event(e)))
+
+        self.run_bg(work, self._bulk_done)
+
+    def stop_bulk(self):
+        if self.cancel is not None:
+            self.cancel.set()
+
+    def on_bulk_event(self, e):
+        ev = e.get("event")
+        if ev == "start":
+            self._total = e["total"]
+            self._words = 0
+            self.bulk_progress.set_key("bulk_progress", done=0, total=e["total"], pct=0)
+        elif ev == "model":
+            self.bulk_current.set_key("bulk_model", pair=e["pair"])
+        elif ev == "mod_start":
+            self.bulk_current.set_key("bulk_current", name=e["name"], done=0, total=0)
+            for pid, (m, s, r) in ((m.package_id, row) for row in self.plan_rows for m in [row[0]]):
+                if m.name == e["name"] and pid in self.rows:
+                    self.tree.item(self.rows[pid], values=self._row_values(m, s, r, running=True))
+                    self.tree.see(self.rows[pid])
+        elif ev == "mod_progress":
+            self.bulk_current.set_key("bulk_current", name=e["name"], done=e["done"], total=e["total"])
+        elif ev == "mod_done":
+            r = e["result"]
+            self._words += r.words
+            total = max(1, e["total"])
+            pct = int(e["index"] * 100 / total)
+            self.pbar["value"] = pct
+            self.bulk_progress.set_key("bulk_progress", done=e["index"], total=e["total"], pct=pct)
+            for m, s, _old in self.plan_rows:
+                if m.package_id == r.package_id and m.package_id in self.rows:
+                    saved = None if r.error else r.to_state(m.fingerprint)
+                    vals = self._row_values(m, "ok", saved)
+                    if r.error:
+                        vals = (m.name, "", 0, 0, self.t("st_error"))
+                    self.tree.item(self.rows[m.package_id], values=vals)
+
+    def _bulk_done(self, results, err):
+        self.bulk_running = False
+        self.bulk_current.set("")
+        if err:
+            self.bulk_summary.set_key("bulk_error", err=err)
+            self.update_bulk_buttons()
+            return
+        cancelled = self.cancel is not None and self.cancel.is_set()
+        words = sum(r.words for r in results or [])
+        if cancelled:
+            self.bulk_progress.set_key("bulk_cancelled")
+        else:
+            self.pbar["value"] = 100
+            self.bulk_progress.set_key("bulk_done", mods=len(results or []), words=words)
+        self.plan_rows = []
+        self.update_bulk_buttons()
+        self.refresh_plan()
+
+    # ------------------------------------------------------------------ details of one mod (double-click)
+    def on_tree_double(self, event):
+        iid = self.tree.identify_row(event.y)
+        for pid, row in self.rows.items():
+            if row == iid:
+                self.show_details(pid)
+                return
+
+    def show_details(self, package_id):
+        """Window with what was translated for one mod, and why the other texts were left alone."""
+        tk, ttk, t = self.tk, self.ttk, self.t
+        entry = next(((m, s, r) for m, s, r in self.plan_rows if m.package_id == package_id), None)
+        tgt = self.selected_target()
+        if entry is None or not tgt:
+            return None
+        mod, _status, saved = entry
+        saved = saved or {}
+        cache = bulk.read_cache(tgt, package_id)
+        skipped = saved.get("skipped", [])
+        top = tk.Toplevel(self.root)
+        top.title(t("det_title", name=mod.name))
+        top.geometry("860x600")
+        top.minsize(640, 420)
+        self.details_windows = getattr(self, "details_windows", [])
+        self.details_windows.append(top)
+        top.columnconfigure(0, weight=1)
+        top.rowconfigure(1, weight=1)
+        head = ttk.Label(top, anchor="w", justify="left", wraplength=800, padding=8,
+                         text=t("det_summary", texts=saved.get("texts", 0), translated=saved.get("translated", 0), cached=saved.get("from_cache", 0),
+                                words=saved.get("words", 0), covered=saved.get("covered", 0), already=saved.get("already_target", 0),
+                                unsupported=len(saved.get("unsupported", [])), failed=saved.get("failed", 0))
+                         + (("\n" + t("det_placeholders", n=saved["placeholders"])) if saved.get("placeholders") else ""))
+        head.grid(row=0, column=0, sticky="ew")
+        nb = ttk.Notebook(top)
+        nb.grid(row=1, column=0, sticky="nsew", padx=8)
+        full = {}
+
+        def make_tab(title, cols, rows):
+            f = ttk.Frame(nb)
+            f.columnconfigure(0, weight=1)
+            f.rowconfigure(0, weight=1)
+            tv = ttk.Treeview(f, columns=[c for c, _ in cols], show="headings")
+            for c, h in cols:
+                tv.heading(c, text=h)
+                tv.column(c, width=300, anchor="w", stretch=True)
+            sbar = ttk.Scrollbar(f, orient="vertical", command=tv.yview)
+            tv.configure(yscrollcommand=sbar.set)
+            tv.grid(row=0, column=0, sticky="nsew")
+            sbar.grid(row=0, column=1, sticky="ns")
+            for vals, texts in rows:
+                full[tv.insert("", "end", values=[self._one_line(v) for v in vals])] = texts
+            nb.add(f, text=title)
+            return tv
+
+        done = sorted(cache.items(), key=lambda kv: kv[0].lower())
+        tv1 = make_tab(t("det_tab_translated", n=len(done)), [("o", t("det_col_orig")), ("t", t("det_col_trans"))],
+                       [((k, v), (k, v)) for k, v in done])
+        reasons = {"covered": lambda d: t("r_covered", provider=d), "already_target": lambda d: t("r_already"),
+                   "unsupported": lambda d: t("r_unsupported", pair=d), "failed": lambda d: t("r_failed")}
+        tv2 = make_tab(t("det_tab_skipped", n=len(skipped)), [("o", t("det_col_orig")), ("r", t("det_col_reason"))],
+                       [((x["text"], reasons.get(x["reason"], lambda d: x["reason"])(x.get("detail", ""))), (x["text"], "")) for x in skipped])
+        # the selected row in full: descriptions are long
+        box = ttk.Frame(top)
+        box.grid(row=2, column=0, sticky="ew", padx=8, pady=6)
+        box.columnconfigure(0, weight=1)
+        txt = tk.Text(box, height=7, wrap="word")
+        txt.grid(row=0, column=0, sticky="ew")
+        txt.configure(state="disabled")
+
+        def on_select(event):
+            tv = event.widget
+            sel = tv.selection()
+            if not sel:
+                return
+            o, tr = full.get(sel[0], ("", ""))
+            txt.configure(state="normal")
+            txt.delete("1.0", "end")
+            txt.insert("end", t("det_full_orig") + "\n" + o + ("\n\n" + t("det_full_trans") + "\n" + tr if tr else ""))
+            txt.configure(state="disabled")
+        tv1.bind("<<TreeviewSelect>>", on_select)
+        tv2.bind("<<TreeviewSelect>>", on_select)
+        if not done and not skipped:
+            txt.configure(state="normal")
+            txt.insert("end", t("det_empty"))
+            txt.configure(state="disabled")
+        ttk.Button(top, text=t("det_close"), command=top.destroy).grid(row=3, column=0, pady=(0, 8))
+        top.details = {"translated": tv1, "skipped": tv2, "text": txt, "full": full}
+        return top
+
+    @staticmethod
+    def _one_line(s, n=160):
+        s = " \u23ce ".join(str(s).split("\n"))
+        return s if len(s) <= n else s[:n] + "..."
+
+    # ------------------------------------------------------------------ lifecycle
+    def _restart(self, exe):
+        updater.restart(exe, [])
+
+    def quit(self, restart_exe=None):
+        if self.cancel is not None:
+            self.cancel.set()
+        try:
+            self.root.after_cancel(self._pump_id)
+        except Exception:
+            pass
+        try:
+            self.httpd.shutdown()
+            self.httpd.server_close()
+        except Exception:
+            log.exception("error while stopping the server")
+        if restart_exe:
+            self.restart_fn(restart_exe)
+        self.root.destroy()
+
+
+def main():
+    """Open the window with the server running. Raises ImportError/TclError if no window is possible."""
+    import tkinter as tk
+    root = tk.Tk()
+    httpd = server.serve(server.DEFAULT_PORT)
+    threading.Thread(target=httpd.serve_forever, daemon=True, name="http-server").start()
+    App(root, httpd)
+    root.mainloop()

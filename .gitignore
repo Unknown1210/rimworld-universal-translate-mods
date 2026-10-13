@@ -1,0 +1,9 @@
+__pycache__/
+*.egg-info/
+dist/
+build/
+*.spec
+*.dll
+*.pdb
+obj/
+bin/

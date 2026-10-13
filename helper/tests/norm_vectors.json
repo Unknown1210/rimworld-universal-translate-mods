@@ -1,0 +1,10 @@
+[
+  ["  iron sword  ", "iron sword"],
+  ["line one\r\nline two", "line one\nline two"],
+  ["A long\n      description   with   spaces", "A long\ndescription with spaces"],
+  ["escaped\\nnewline", "escaped\nnewline"],
+  ["tabs\t\tand \t spaces", "tabs and spaces"],
+  ["mixed \\n  text \r\n here ", "mixed\ntext\nhere"],
+  ["Hello {0}!", "Hello {0}!"],
+  ["", ""]
+]

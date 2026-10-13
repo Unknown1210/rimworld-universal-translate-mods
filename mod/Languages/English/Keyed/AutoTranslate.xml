@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <AT_On>Translations are ON</AT_On>
+  <AT_Off>Translations are OFF - showing the original texts</AT_Off>
+  <AT_BtnOff>Turn translations OFF (compare with the original)</AT_BtnOff>
+  <AT_BtnOn>Turn translations ON</AT_BtnOn>
+  <AT_TargetFromHelper>Translating into: {0} (chosen in the translator program).</AT_TargetFromHelper>
+  <AT_TargetFromGame>Translating into: {0} (the game's language). Choose another one in the translator program.</AT_TargetFromGame>
+  <AT_TargetNone>No target language yet: choose one in the translator program.</AT_TargetNone>
+  <AT_ApplyOnClose>Changes apply when you close this window.</AT_ApplyOnClose>
+  <AT_HelperProblem>Translator program: {0}</AT_HelperProblem>
+  <AT_Mods>Mods ({0})</AT_Mods>
+  <AT_ModsHint>Only texts that have no translation yet are translated.</AT_ModsHint>
+  <AT_Enabled>Enabled</AT_Enabled>
+  <AT_Reenable>Re-enable</AT_Reenable>
+  <AT_Mode_auto>Automatic (recommended)</AT_Mode_auto>
+  <AT_Mode_native>The mod's own translation</AT_Mode_native>
+  <AT_Mode_third>Another translation mod</AT_Mode_third>
+  <AT_Mode_mine>Always automatic translation</AT_Mode_mine>
+  <AT_Advanced>Advanced</AT_Advanced>
+  <AT_AdvancedHide>Hide advanced options</AT_AdvancedHide>
+  <AT_OptDefs>Translate items, buildings, etc. (Defs)</AT_OptDefs>
+  <AT_OptKeyed>Translate interface texts (Keyed)</AT_OptKeyed>
+  <AT_OptMeta>Translate mod descriptions (Mods screen)</AT_OptMeta>
+  <AT_OptVerbose>Detailed log</AT_OptVerbose>
+  <AT_BtnCheck>Check translator program</AT_BtnCheck>
+  <AT_BtnLogs>Open logs folder</AT_BtnLogs>
+  <AT_BtnCopy>Copy diagnostics</AT_BtnCopy>
+  <AT_BtnReport>Create problem report</AT_BtnReport>
+  <AT_BtnClear>Clear translation cache</AT_BtnClear>
+  <AT_ClearConfirm>Delete all saved translations for {0}? They will be translated again.</AT_ClearConfirm>
+  <AT_Checking>checking...</AT_Checking>
+  <AT_HelperOk>Translator program OK (v{0}). Models: {1}</AT_HelperOk>
+  <AT_HelperFail>Not reachable: {0}</AT_HelperFail>
+  <AT_Banner>{0} mod(s) were switched off because of problems. Create a problem report and send it.</AT_Banner>
+  <AT_ReportSaved>Report saved: {0} - attach it to the GitHub page that just opened.</AT_ReportSaved>
+  <AT_R_Nothing>Nothing to translate</AT_R_Nothing>
+  <AT_R_Disabled>Disabled by you</AT_R_Disabled>
+  <AT_R_AutoDisabled>Switched off after problems: {0}</AT_R_AutoDisabled>
+  <AT_R_Own>Own translation: {0}</AT_R_Own>
+  <AT_R_Third>Other mod ({0}): {1}</AT_R_Third>
+  <AT_R_Auto>Translated: {0}/{1}</AT_R_Auto>
+  <AT_R_Failed>{0} failed</AT_R_Failed>
+  <AT_R_Cache>{0} from cache</AT_R_Cache>
+  <AT_R_Already>Already in your language: {0}</AT_R_Already>
+  <AT_R_Placeholder>Translation files only repeat the original: {0} (translated anyway)</AT_R_Placeholder>
+  <AT_R_Unavail>Original text unavailable: {0}</AT_R_Unavail>
+  <AT_R_Support>{0} to {1}: supported</AT_R_Support>
+  <AT_R_SupportDownload>{0} to {1}: supported (the model downloads on first use)</AT_R_SupportDownload>
+  <AT_R_NoSupport>{0} to {1}: NO SUPPORT (left as it is)</AT_R_NoSupport>
+  <AT_R_SupportUnknown>{0} to {1}: unknown (translator program not reachable)</AT_R_SupportUnknown>
+  <AT_R_Checking>{0} to {1}: checking support...</AT_R_Checking>
+  <AT_St_notstarted>Not started</AT_St_notstarted>
+  <AT_St_starting>Starting</AT_St_starting>
+  <AT_St_disabled>Disabled in the settings</AT_St_disabled>
+  <AT_St_idle>Waiting: choose a target language</AT_St_idle>
+  <AT_St_ready>Ready</AT_St_ready>
+  <AT_St_translating>Translating in the background ({0} texts)</AT_St_translating>
+  <AT_St_translatingmod>Translating "{0}" ({1} to {2})</AT_St_translatingmod>
+  <AT_St_prepmodel>Preparing translation model {0} to {1}</AT_St_prepmodel>
+  <AT_St_download>Downloading translation model {0} to {1}</AT_St_download>
+  <AT_St_done>Done</AT_St_done>
+  <AT_St_donefail>Done; {0} text(s) failed - see the log</AT_St_donefail>
+  <AT_St_crash>The translator stopped: {0}</AT_St_crash>
+  <AT_St_waithelper>Waiting for the translator program (is it running?)</AT_St_waithelper>
+  <AT_St_helperlost>Lost the translator program; reconnecting</AT_St_helperlost>
+  <AT_St_modelnotready>Translation model not ready</AT_St_modelnotready>
+  <AT_St_unhealthy>The translator is failing - see helper.log</AT_St_unhealthy>
+</LanguageData>

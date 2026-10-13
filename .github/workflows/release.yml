@@ -1,0 +1,95 @@
+name: Release
+# On every push to main: if the version in VERSION has no release yet, build the Windows helper (.exe) and the
+# compiled mod, and publish them as a GitHub Release with the notes taken from CHANGELOG.md.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      needed: ${{ steps.v.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          python3 tools/set_version.py --check
+          V=$(tr -d '[:space:]' < VERSION)
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null 2>&1; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"; echo "Release v$V already exists - nothing to do"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  helper-exe:
+    needs: check
+    if: needs.check.outputs.needed == 'true'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install ./helper pyinstaller
+      - run: python -I -m unittest discover -s helper/tests
+      - run: pyinstaller --onefile --noconsole --name UniversalTranslate-Helper --collect-all ctranslate2 --collect-all sentencepiece helper/run_rwtranslate.py
+      - name: Self-test the .exe (it has no console window, so it writes its report to a file)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath dist\UniversalTranslate-Helper.exe -ArgumentList '--selftest','selftest.txt' -Wait -PassThru
+          if (Test-Path selftest.txt) { Get-Content selftest.txt } else { Write-Host "no selftest.txt written" }
+          if ($p.ExitCode -ne 0 -or -not (Test-Path selftest.txt) -or -not (Select-String -Path selftest.txt -Pattern '^OK')) { throw "exe self-test failed" }
+      - uses: actions/upload-artifact@v4
+        with: { name: helper-exe, path: dist/UniversalTranslate-Helper.exe }
+
+  mod-zip:
+    needs: check
+    if: needs.check.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "8.0.x" }
+      - run: sudo apt-get update && sudo apt-get install -y mono-mcs mono-devel
+      - run: mod/tools/run-tests.sh
+      - name: Build against the public RimWorld 1.6 reference assemblies
+        run: dotnet build mod/AutoTranslate.csproj -c Release -p:RimWorldDir=/nonexistent
+      - name: Assemble the mod folder
+        run: |
+          mkdir -p pkg/AutoTranslate/1.6/Assemblies
+          cp -r mod/About pkg/AutoTranslate/About
+          cp mod/LoadFolders.xml pkg/AutoTranslate/
+          cp -r mod/Languages pkg/AutoTranslate/Languages
+          cp mod/1.6/Assemblies/RimWorldAutoTranslate.dll pkg/AutoTranslate/1.6/Assemblies/
+          cd pkg && zip -r ../UniversalTranslate-Mod.zip AutoTranslate
+          cd .. && python3 mod/tools/check_package.py UniversalTranslate-Mod.zip
+      - uses: actions/upload-artifact@v4
+        with: { name: mod-zip, path: UniversalTranslate-Mod.zip }
+
+  release:
+    needs: [check, helper-exe, mod-zip]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: assets }
+      - name: Notes from CHANGELOG.md
+        run: |
+          V=${{ needs.check.outputs.version }}
+          awk -v v="## v$V " 'index($0,v)==1{f=1;next} /^## v/{f=0} f' CHANGELOG.md > notes.md
+          { echo; echo "### Como instalar"; echo "1. Baixe **UniversalTranslate-Helper.exe** e **UniversalTranslate-Mod.zip**."; \
+            echo "2. Extraia a pasta \`AutoTranslate\` do zip para \`RimWorld\\Mods\`."; \
+            echo "3. Execute o .exe e deixe a janela aberta enquanto joga. Ative Harmony e depois Auto Translate."; \
+            echo; echo "SHA-256:"; echo '```'; (cd assets && sha256sum helper-exe/*.exe mod-zip/*.zip); echo '```'; } >> notes.md
+          cat notes.md
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=${{ needs.check.outputs.version }}
+          gh release create "v$V" --target "${{ github.sha }}" --title "v$V" --notes-file notes.md \
+            assets/helper-exe/UniversalTranslate-Helper.exe assets/mod-zip/UniversalTranslate-Mod.zip

@@ -1,0 +1,23 @@
+name: Relatório de problema / Problem report
+description: Um mod deu conflito ou algo falhou / A mod conflicted or something failed
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        No jogo: Opções do mod **Auto Translate → "Create problem report"**. Anexe o arquivo `report-*.md` aqui (arraste para a caixa de texto).
+        Sem o jogo aberto: rode `rwtranslate report` e anexe o .zip. In-game: mod options → Create problem report, then attach the file.
+  - type: input
+    id: version
+    attributes: { label: Versão do Auto Translate / version, placeholder: "0.2" }
+    validations: { required: true }
+  - type: input
+    id: mod
+    attributes: { label: Mod com conflito (nome ou link da Steam) / conflicting mod }
+  - type: textarea
+    id: what
+    attributes: { label: O que aconteceu? / What happened? }
+    validations: { required: true }
+  - type: textarea
+    id: report
+    attributes: { label: Relatório (anexe o arquivo ou cole aqui) / Report (attach or paste) }

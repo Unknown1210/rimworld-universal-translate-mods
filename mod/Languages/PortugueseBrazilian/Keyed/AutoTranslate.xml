@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LanguageData>
+  <AT_On>Traduções ATIVADAS</AT_On>
+  <AT_Off>Traduções DESATIVADAS - mostrando os textos originais</AT_Off>
+  <AT_BtnOff>Desativar traduções (comparar com o original)</AT_BtnOff>
+  <AT_BtnOn>Ativar traduções</AT_BtnOn>
+  <AT_TargetFromHelper>Traduzindo para: {0} (escolhido no programa tradutor).</AT_TargetFromHelper>
+  <AT_TargetFromGame>Traduzindo para: {0} (o idioma do jogo). Escolha outro no programa tradutor.</AT_TargetFromGame>
+  <AT_TargetNone>Ainda sem idioma de destino: escolha um no programa tradutor.</AT_TargetNone>
+  <AT_ApplyOnClose>As mudanças valem quando você fechar esta janela.</AT_ApplyOnClose>
+  <AT_HelperProblem>Programa tradutor: {0}</AT_HelperProblem>
+  <AT_Mods>Mods ({0})</AT_Mods>
+  <AT_ModsHint>Só os textos que ainda não têm tradução são traduzidos.</AT_ModsHint>
+  <AT_Enabled>Ativado</AT_Enabled>
+  <AT_Reenable>Reativar</AT_Reenable>
+  <AT_Mode_auto>Automático (recomendado)</AT_Mode_auto>
+  <AT_Mode_native>A tradução do próprio mod</AT_Mode_native>
+  <AT_Mode_third>Outro mod de tradução</AT_Mode_third>
+  <AT_Mode_mine>Sempre a tradução automática</AT_Mode_mine>
+  <AT_Advanced>Avançado</AT_Advanced>
+  <AT_AdvancedHide>Ocultar opções avançadas</AT_AdvancedHide>
+  <AT_OptDefs>Traduzir itens, construções etc. (Defs)</AT_OptDefs>
+  <AT_OptKeyed>Traduzir textos de interface (Keyed)</AT_OptKeyed>
+  <AT_OptMeta>Traduzir descrições dos mods (tela de Mods)</AT_OptMeta>
+  <AT_OptVerbose>Log detalhado</AT_OptVerbose>
+  <AT_BtnCheck>Verificar programa tradutor</AT_BtnCheck>
+  <AT_BtnLogs>Abrir pasta de logs</AT_BtnLogs>
+  <AT_BtnCopy>Copiar diagnóstico</AT_BtnCopy>
+  <AT_BtnReport>Criar relatório de problema</AT_BtnReport>
+  <AT_BtnClear>Limpar cache de traduções</AT_BtnClear>
+  <AT_ClearConfirm>Apagar todas as traduções salvas para {0}? Elas serão traduzidas de novo.</AT_ClearConfirm>
+  <AT_Checking>verificando...</AT_Checking>
+  <AT_HelperOk>Programa tradutor OK (v{0}). Modelos: {1}</AT_HelperOk>
+  <AT_HelperFail>Sem conexão: {0}</AT_HelperFail>
+  <AT_Banner>{0} mod(s) foram desligados por causa de problemas. Crie um relatório de problema e envie.</AT_Banner>
+  <AT_ReportSaved>Relatório salvo: {0} - anexe-o na página do GitHub que acabou de abrir.</AT_ReportSaved>
+  <AT_R_Nothing>Nada para traduzir</AT_R_Nothing>
+  <AT_R_Disabled>Desativado por você</AT_R_Disabled>
+  <AT_R_AutoDisabled>Desligado após problemas: {0}</AT_R_AutoDisabled>
+  <AT_R_Own>Tradução própria: {0}</AT_R_Own>
+  <AT_R_Third>Outro mod ({0}): {1}</AT_R_Third>
+  <AT_R_Auto>Traduzidos: {0}/{1}</AT_R_Auto>
+  <AT_R_Failed>{0} falharam</AT_R_Failed>
+  <AT_R_Cache>{0} do cache</AT_R_Cache>
+  <AT_R_Already>Já no seu idioma: {0}</AT_R_Already>
+  <AT_R_Placeholder>Arquivos de tradução só repetem o original: {0} (traduzidos mesmo assim)</AT_R_Placeholder>
+  <AT_R_Unavail>Texto original indisponível: {0}</AT_R_Unavail>
+  <AT_R_Support>{0} para {1}: com suporte</AT_R_Support>
+  <AT_R_SupportDownload>{0} para {1}: com suporte (o modelo é baixado no primeiro uso)</AT_R_SupportDownload>
+  <AT_R_NoSupport>{0} para {1}: SEM SUPORTE (fica como está)</AT_R_NoSupport>
+  <AT_R_SupportUnknown>{0} para {1}: desconhecido (programa tradutor sem conexão)</AT_R_SupportUnknown>
+  <AT_R_Checking>{0} para {1}: verificando suporte...</AT_R_Checking>
+  <AT_St_notstarted>Não iniciado</AT_St_notstarted>
+  <AT_St_starting>Iniciando</AT_St_starting>
+  <AT_St_disabled>Desativado nas opções</AT_St_disabled>
+  <AT_St_idle>Aguardando: escolha o idioma de destino</AT_St_idle>
+  <AT_St_ready>Pronto</AT_St_ready>
+  <AT_St_translating>Traduzindo em segundo plano ({0} textos)</AT_St_translating>
+  <AT_St_translatingmod>Traduzindo "{0}" ({1} para {2})</AT_St_translatingmod>
+  <AT_St_prepmodel>Preparando o modelo de tradução {0} para {1}</AT_St_prepmodel>
+  <AT_St_download>Baixando o modelo de tradução {0} para {1}</AT_St_download>
+  <AT_St_done>Concluído</AT_St_done>
+  <AT_St_donefail>Concluído; {0} texto(s) falharam - veja o log</AT_St_donefail>
+  <AT_St_crash>O tradutor parou: {0}</AT_St_crash>
+  <AT_St_waithelper>Aguardando o programa tradutor (ele está aberto?)</AT_St_waithelper>
+  <AT_St_helperlost>Perdi a conexão com o programa tradutor; reconectando</AT_St_helperlost>
+  <AT_St_modelnotready>Modelo de tradução ainda não está pronto</AT_St_modelnotready>
+  <AT_St_unhealthy>O tradutor está falhando - veja o helper.log</AT_St_unhealthy>
+</LanguageData>
