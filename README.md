@@ -1,5 +1,7 @@
 # Universal Translate for RimWorld
 
+**Versão atual: 0.002** · [Baixar na aba Releases](../../releases/latest)
+
 Traduz **automaticamente** os outros mods do seu jogo para o seu idioma, **sem precisar de um mod de tradução para cada mod**.
 A tradução é feita **no seu computador, sem internet e de graça**. Cada tradução fica salva, então ela só é feita uma vez.
 

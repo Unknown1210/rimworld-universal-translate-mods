@@ -2,7 +2,7 @@
 
 ## Versioning (mandatory, set by the maintainer)
 - Version scheme is `0.NNN` with three digits (0.001, 0.002, 0.003 ...) with no upper limit until the maintainer explicitly says it is 1.0.
-- **Every commit/push** must: bump the number in `VERSION`, run `python tools/set_version.py` (syncs helper + mod), add a
+- **Every commit/push** must: bump the number in `VERSION`, run `python tools/set_version.py` (syncs helper + mod + the "Versão atual" line of the README), add a
   `## v0.NNN - date` entry at the top of `CHANGELOG.md` describing what changed, and run `python tools/set_version.py --check`.
 - Commit message format (simple language, in Portuguese): first line `v0.NNN: título curto`, a blank line, then a
   **bullet list of every item changed** (`- Adicionado: ...`, `- Corrigido: ...`, `- Alterado: ...`, `- Removido: ...`),
@@ -21,3 +21,5 @@
 - Before every push: `git log -1 --format=%B` must contain only the version title and the bullet list.
 - Tests: `python -I -m unittest discover -s helper/tests` and `mod/tools/run-tests.sh` (needs mono-mcs).
 - The commit message and CHANGELOG entry list everything changed in that version. Check all files for private data before pushing (`git grep` for session links, e-mails, local paths).
+- Keep the README up to date with each version: the "Versão atual" line is synced by `set_version.py`; if a change alters how the program is used, update the README text too.
+- Work directly on `main` (no extra branches, no pull requests) unless the maintainer says otherwise.

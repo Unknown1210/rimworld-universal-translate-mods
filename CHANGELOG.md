@@ -4,6 +4,10 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.002 - 2026-10-13
+- Adicionado: o README mostra a versão atual no topo ("Versão atual") e o `tools/set_version.py` atualiza essa linha sozinho; a verificação de versão do CI falha se o README ficar desatualizado.
+- Alterado: regras do projeto (`CLAUDE.md`): trabalhar direto na `main`, sem branches extras nem pull requests, e manter o README atualizado a cada versão.
+
 ## v0.001 - 2026-10-13
 Início deste repositório: reúne o resultado do projeto anterior (versões 0.1 a 0.13 do protótipo; o histórico antigo não foi trazido).
 - Adicionado: mod do jogo (C#, Harmony, RimWorld 1.6) que traduz automaticamente os outros mods instalados, só o que não tem tradução, detectando o idioma de cada mod; falha de um mod desliga só aquele mod.
