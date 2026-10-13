@@ -1,11 +1,11 @@
 # Universal Translate for RimWorld
 
-**Versão atual: 0.002** · [Baixar na aba Releases](../../releases/latest)
+**Versão atual: 0.003** · [Baixar na aba Releases](../../releases/latest)
 
 Traduz **automaticamente** os outros mods do seu jogo para o seu idioma, **sem precisar de um mod de tradução para cada mod**.
 A tradução é feita **no seu computador, sem internet e de graça**. Cada tradução fica salva, então ela só é feita uma vez.
 
-> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versões 0.x). Veja "Estado atual" abaixo.
+> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.003). Veja "Estado atual" abaixo.
 
 ## Compatibilidade
 | | |
@@ -76,7 +76,7 @@ Em **Opções → Mods → Auto Translate** (a tela segue o idioma do seu jogo):
 - Tudo fica em `%LOCALAPPDATA%\RimWorldAutoTranslate`: modelos, traduções salvas (`cache`), suas correções (`overrides`) e logs (`logs`).
 
 ## Estado atual (transparência)
-Esta é uma **versão inicial** (0.x), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. A tradução automática pode errar.
+Esta é uma **versão inicial** (versão atual 0.003), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. A tradução automática pode errar. Ainda **não foi validado**: a tradução com os modelos reais em mods de verdade (os testes usam tradutores falsos) e a tela do mod dentro do jogo.
 
 ## Deu problema ou conflito com um mod?
 1. No jogo: **Opções → Mods → Auto Translate → Avançado → Criar relatório de problema** (ou o botão **Relatório de problema** do executável).

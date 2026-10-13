@@ -2,7 +2,7 @@
 
 ## Versioning (mandatory, set by the maintainer)
 - Version scheme is `0.NNN` with three digits (0.001, 0.002, 0.003 ...) with no upper limit until the maintainer explicitly says it is 1.0.
-- **Every commit/push** must: bump the number in `VERSION`, run `python tools/set_version.py` (syncs helper + mod + the "Versão atual" line of the README), add a
+- **Every commit/push** must: bump the number in `VERSION`, run `python tools/set_version.py` (syncs helper + mod + the "current version" mentions in the README and in mod/About/About.xml), add a
   `## v0.NNN - date` entry at the top of `CHANGELOG.md` describing what changed, and run `python tools/set_version.py --check`.
 - Commit message format (simple language, in Portuguese): first line `v0.NNN: título curto`, a blank line, then a
   **bullet list of every item changed** (`- Adicionado: ...`, `- Corrigido: ...`, `- Alterado: ...`, `- Removido: ...`),

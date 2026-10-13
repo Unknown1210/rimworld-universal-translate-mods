@@ -4,6 +4,10 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.003 - 2026-10-13
+- Alterado: o aviso "em desenvolvimento" e a seção "Estado atual" do README, e a descrição do mod na tela de Mods (inglês e português), mostram a versão atual em vez de "0.x"; o `tools/set_version.py` atualiza esses trechos sozinho e a verificação do CI confere.
+- Adicionado: no "Estado atual" do README, o que ainda não foi validado (tradução com modelos reais em mods de verdade e a tela do mod dentro do jogo).
+
 ## v0.002 - 2026-10-13
 - Adicionado: o README mostra a versão atual no topo ("Versão atual") e o `tools/set_version.py` atualiza essa linha sozinho; a verificação de versão do CI falha se o README ficar desatualizado.
 - Alterado: regras do projeto (`CLAUDE.md`): trabalhar direto na `main`, sem branches extras nem pull requests, e manter o README atualizado a cada versão.
