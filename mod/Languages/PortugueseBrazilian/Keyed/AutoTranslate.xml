@@ -28,8 +28,8 @@
   <AT_Enabled>Ativado</AT_Enabled>
   <AT_Reenable>Reativar</AT_Reenable>
   <AT_Mode_auto>Automático (recomendado)</AT_Mode_auto>
-  <AT_Mode_native>A tradução do próprio mod</AT_Mode_native>
-  <AT_Mode_third>Outro mod de tradução</AT_Mode_third>
+  <AT_Mode_native>Preferir a tradução do próprio mod</AT_Mode_native>
+  <AT_Mode_third>Preferir a tradução de outro mod</AT_Mode_third>
   <AT_Mode_mine>Sempre a tradução automática</AT_Mode_mine>
   <AT_Advanced>Avançado</AT_Advanced>
   <AT_AdvancedHide>Ocultar opções avançadas</AT_AdvancedHide>

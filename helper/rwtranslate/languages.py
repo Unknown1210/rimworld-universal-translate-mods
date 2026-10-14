@@ -10,7 +10,7 @@ GAME_LANGUAGES = {
     "english": "en",
     "portugues brasileiro": "pt-BR", "portuguese brazilian": "pt-BR", "portuguesebrazilian": "pt-BR",
     "portugues": "pt-PT", "portuguese": "pt-PT",
-    "espanol": "es", "spanish": "es", "espanol latino": "es", "spanishlatin": "es",
+    "espanol": "es", "spanish": "es", "espanol castellano": "es", "spanishlatin": "es-419",
     "francais": "fr", "french": "fr",
     "deutsch": "de", "german": "de",
     "italiano": "it", "italian": "it",
@@ -23,13 +23,23 @@ GAME_LANGUAGES = {
     "magyar": "hu", "hungarian": "hu",
     "japanese": "ja", "korean": "ko",
     "chinese simplified": "zh", "simplified chinese": "zh", "chinesesimplified": "zh",
-    "chinese traditional": "zh", "chinesetraditional": "zh",
+    "chinese traditional": "zh-Hant", "chinesetraditional": "zh-Hant",
+    "spanish latin": "es-419", "espanol latinoamerica": "es-419", "espanol latino": "es-419",
+    "korean fast channel": "ko-FC", "koreanfastchannel": "ko-FC",
+    "norwegian": "nb", "norwegian bokmal": "nb", "norsk": "nb",
+    "catalan": "ca", "danish": "da", "dansk": "da", "estonian": "et", "finnish": "fi", "greek": "el",
+    "romanian": "ro", "slovak": "sk", "swedish": "sv", "vietnamese": "vi",
 }
 
 
 # Target languages with regional variants. RimWorld has two Portuguese languages (folders "Portuguese" = Portugal and
 # "PortugueseBrazilian" = Brazil) and Argos has a model for each: "pb" is Brazilian, "pt" is the general/European one.
 FAMILY = {"pb": "pt"}          # model/detector codes that belong to the same language as another code
+
+
+# Variants that share a model with another language: code -> Argos model code
+MODEL_OF = {"zh-hant": "zt", "es-419": "es", "ko-fc": "ko"}
+CANONICAL = {"zh-hant": "zh-Hant", "es-419": "es-419", "ko-fc": "ko-FC"}
 
 
 def norm_target(code):
@@ -42,13 +52,13 @@ def norm_target(code):
         return "pt-BR"
     if low == "pt-pt":
         return "pt-PT"
-    return low
+    return CANONICAL.get(low, low)
 
 
 def model_code(code):
     """Code of the Argos model: pt-BR -> pb, pt-PT -> pt, everything else unchanged (a plain "pt" is a SOURCE language: model "pt")."""
     low = (code or "").replace("_", "-").lower()
-    return "pb" if low == "pt-br" else "pt" if low == "pt-pt" else code
+    return "pb" if low == "pt-br" else "pt" if low == "pt-pt" else MODEL_OF.get(low, code)
 
 
 def family(code):

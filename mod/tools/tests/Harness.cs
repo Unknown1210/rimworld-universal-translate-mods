@@ -30,7 +30,7 @@ public static class Harness
 
         // ---- LangMap
         Check(LangMap.FromName("Português Brasileiro") == "pt-BR" && LangMap.FromName("Português") == "pt-PT", "LangMap pt-BR / pt-PT native names");
-        Check(LangMap.FromName("PortugueseBrazilian") == "pt-BR" && LangMap.FromName("Portuguese") == "pt-PT" && LangMap.FromName("SpanishLatin") == "es", "LangMap folder names");
+        Check(LangMap.FromName("PortugueseBrazilian") == "pt-BR" && LangMap.FromName("Portuguese") == "pt-PT" && LangMap.FromName("SpanishLatin") == "es-419" && LangMap.FromName("ChineseTraditional") == "zh-Hant" && LangMap.FromName("KoreanFastChannel") == "ko-FC", "LangMap folder names");
         Check(LangMap.NormTarget("pt") == "pt-BR" && LangMap.NormTarget("pt_br") == "pt-BR" && LangMap.NormTarget("PT-pt") == "pt-PT" && LangMap.NormTarget("JA") == "ja", "old \"pt\" setting becomes Brazilian Portuguese");
         Check(LangMap.Same("pt", "pt-BR") && LangMap.Same("pb", "pt-PT") && !LangMap.Same("pt-BR", "es") && LangMap.ModelCode("pt-BR") == "pb" && LangMap.ModelCode("pt-PT") == "pt" && LangMap.ModelCode("pt") == "pt", "Portuguese variants: same language, own model codes");
         Check(LangMap.FromName("Klingon") == null, "LangMap unknown");
@@ -255,7 +255,7 @@ public static class Harness
         var w = Build(home, "s3", false);
         Run("pt");
         Check(w.Shield.label == "wooden shield (pt)", "'mine': automatic translation even though a third-party one exists (" + w.Shield.label + ")");
-        Check(w.Covered.label == "Item coberto" && w.Uncovered.label == "uncovered item", "'native': own text only, uncovered stays English");
+        Check(w.Covered.label == "Item coberto" && w.Uncovered.label == "uncovered item (pt)", "'native': own text preferred, the rest is still translated (" + w.Uncovered.label + ")");
         Pipeline.SetMode(Mod("a.good"), ModMode.Off);
         Check(w.Shield.label == "wooden shield" && w.Sword.label == "iron sword" && w.En.keyedReplacements["Good_Greeting"].value == "Hello {0}!", "switching a mod off reverts it immediately");
         Check(AutoTranslateMod.Settings.modModes["a.good"] == ModMode.Off, "choice stored in settings");

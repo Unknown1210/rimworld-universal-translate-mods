@@ -4,6 +4,18 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.011 - 2026-10-14
+- Corrigido: nomes curtos como "safe" (cofre) saíam como "Seguro." na tradução. Agora o tradutor não coloca ponto final em nome curto que no original não tem, e um pequeno glossário traduz "safe" como "cofre" (e equivalentes nos outros idiomas). Traduções antigas já salvas só mudam depois de "Excluir traduções" e de traduzir de novo.
+- Corrigido: mods em modo "do próprio mod" ou "de outro mod de tradução" ficavam inteiros em inglês quando não havia essa tradução (ex.: Vanilla Furniture Expanded - Security). Agora esses modos são "preferir": o que o mod escolhido não traz é traduzido automaticamente.
+- Alterado: os modos por mod se chamam "Preferir a tradução do próprio mod" e "Preferir a tradução de outro mod".
+- Alterado: a tela de opções do mod ficou mais compacta para a lista de mods ganhar espaço: o atalho (texto, "Definir atalho" e "Remover atalho") ocupa uma linha só, e o idioma, o estado e o erro do programa tradutor viram um parágrafo só, com o erro encurtado.
+- Alterado: o idioma de destino, o seletor de idioma da janela do executável e o mod passam a oferecer somente os 30 idiomas do RimWorld (Catalão, Chinês Simplificado e Tradicional, Tcheco, Dinamarquês, Holandês, Inglês, Estoniano, Finlandês, Francês, Alemão, Grego, Húngaro, Italiano, Japonês, Coreano, Coreano Fast Channel, Norueguês Bokmål, Polonês, Português Portugal e Brasil, Romeno, Russo, Eslovaco, Espanhol Castelhano e América Latina, Sueco, Turco, Ucraniano e Vietnamita). Os outros idiomas saíram da lista.
+- Adicionado: a janela do executável pode ficar em qualquer um dos 30 idiomas. Português e inglês são escritos à mão; os outros são traduzidos do inglês, na primeira vez, com os modelos do próprio programa (baixando o modelo se precisar), salvos numa pasta "ui" e usados nas próximas vezes. Enquanto isso a janela fica em inglês, com um aviso.
+- Adicionado: o mod e o programa reconhecem Chinês Tradicional (zh-Hant), Espanhol da América Latina (es-419) e Coreano Fast Channel (ko-FC), usando os modelos de chinês tradicional, espanhol e coreano.
+- Adicionado: aviso no diagnóstico de cada mod e testes novos (glossário, ponto final, idiomas da janela, modos "preferir").
+- Adicionado: README em inglês (README.en.md), com links de troca de idioma no topo dos dois; a versão é atualizada nos dois por tools/set_version.py.
+- Alterado: README: link da oficina da Steam do Harmony e do GitHub do Argos Translate; tabela de idiomas com os 30 do RimWorld; texto do estado atual diz que a tradução automática não é 100% perfeita e pede para reportar erros; removidos itens sobre atualizar sem janela e token do GitHub e a frase sobre janela preta.
+
 ## v0.010 - 2026-10-14
 - Corrigido: nomes e descrições de itens que ficavam em inglês no jogo mesmo com a tradução pronta no cache (ex.: Electric stonecutter's table, Drug cabinet, Military turret). Causa: textos gerados pelo próprio jogo (plantas de construção/molduras, já no idioma do jogo) faziam o mod achar que o mod traduzido já estava em português e descartar os textos curtos; agora esses textos gerados são ignorados na detecção de idioma do mod.
 - Corrigido: ao recarregar o jogo, o texto original em inglês é mantido como fonte da tradução.

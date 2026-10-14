@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, urlparse
 from . import __version__, activity, languages, logsetup, models
 from .engine import EngineError, get_engine
 from .paths import port_file, token_file
+from . import glossary
 from .protect import clean_output, translate_protected
 
 log = logsetup.get("server")
@@ -41,11 +42,15 @@ def translate_texts(source, target, texts):
     if languages.same(source, target):
         return list(texts)
     engine = get_engine(source, target)
-    return [clean_output(t, translate_protected(t, engine.translate_batch), target) for t in texts]
+    out = []
+    for t in texts:
+        g = glossary.lookup(source, target, t)
+        out.append(clean_output(t, g if g is not None else translate_protected(t, engine.translate_batch), target))
+    return out
 
 
 def _code_ok(c):
-    return isinstance(c, str) and re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z]{2})?", c) is not None
+    return isinstance(c, str) and re.fullmatch(r"[A-Za-z]{2,3}(-[A-Za-z0-9]{2,4})?", c) is not None
 
 
 class HttpError(Exception):

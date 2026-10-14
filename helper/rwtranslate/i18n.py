@@ -1,9 +1,14 @@
-"""Texts of the helper window in Portuguese and English. The language follows the system language
+"""Texts of the helper window: Portuguese and English by hand, every other RimWorld language machine-translated (uitext.py). The language follows the system language
 (pt* -> Portuguese, anything else -> English) unless the user picked one; the choice is remembered in config.json."""
 from . import config, languages
 from .paths import data_dir  # noqa: F401  (tests reach the data dir through this module)
 
-UI_LANGS = ("pt", "en")
+# Window languages = the languages RimWorld itself offers (the same list as the target languages). "pt" and "en" are written by
+# hand; every other one is machine-translated from the English texts on first use (see uitext.py) and cached.
+GAME_LANGS = ["ca", "zh", "zh-Hant", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "ja", "ko", "ko-FC", "nb",
+              "pl", "pt-PT", "pt-BR", "ro", "ru", "sk", "es", "es-419", "sv", "tr", "uk", "vi"]
+UI_LANGS = tuple(GAME_LANGS)
+HANDWRITTEN = ("pt", "en")
 
 TEXT = {
     "pt": {
@@ -27,6 +32,8 @@ TEXT = {
         "report_btn": "Relatório de problema",
         "quit_btn": "Sair",
         "ui_lang": "Idioma da janela:",
+        "ui_preparing": "Preparando a janela neste idioma (traduzindo e baixando o modelo se precisar)... Por enquanto fica em inglês.",
+        "ui_prepare_failed": "Não consegui preparar este idioma agora (sem internet ou sem o modelo). A janela fica em inglês.",
         "check_failed": "Não foi possível verificar: {err}",
         "new_version": "Nova versão disponível: {latest} (você tem {current}).",
         "up_to_date": "Você já está na versão mais nova ({current}).",
@@ -161,6 +168,8 @@ TEXT = {
         "report_btn": "Problem report",
         "quit_btn": "Quit",
         "ui_lang": "Window language:",
+        "ui_preparing": "Preparing the window in this language (translating, and downloading the model if needed)... English for now.",
+        "ui_prepare_failed": "Could not prepare this language right now (offline, or the model is missing). The window stays in English.",
         "check_failed": "Could not check: {err}",
         "new_version": "New version available: {latest} (you have {current}).",
         "up_to_date": "You already have the latest version ({current}).",
@@ -277,13 +286,31 @@ TEXT = {
 }
 
 
+def text_source(code):
+    """Which set of texts a window language uses: Portuguese (Brazil and Portugal) share the handwritten Portuguese,
+    Latin American Spanish shares Spanish, Korean Fast Channel shares Korean."""
+    return {"pt-BR": "pt", "pt-PT": "pt", "es-419": "es", "ko-FC": "ko"}.get(code, code)
+
+
+def normalize_choice(code):
+    """Old settings stored "pt": that is Brazil now."""
+    return "pt-BR" if code == "pt" else code
+
+
 def system_ui_lang():
+    tag = (languages._system_tag() or "").replace("_", "-").split(".")[0]
+    if tag.upper().startswith("PT-PT"):
+        return "pt-PT"
     s = languages.system_language()
-    return "pt" if s == "pt" else "en"
+    if s == "pt":
+        return "pt-BR"
+    if s == "zh":
+        return "zh-Hant" if tag.lower().startswith(("zh-tw", "zh-hk", "zh-hant")) else "zh"
+    return s if s in UI_LANGS else "en"
 
 
 def load_choice():
-    c = config.get("ui_lang")
+    c = normalize_choice(config.get("ui_lang"))
     return c if c in UI_LANGS else None
 
 
@@ -297,44 +324,56 @@ def current():
 
 def tr(_ui, key, **kw):
     """_ui is positional on purpose: texts may use a {lang} placeholder, which must not collide with this parameter."""
-    text = TEXT.get(_ui, TEXT["en"]).get(key) or TEXT["en"][key]
-    return text.format(**kw) if kw else text
+    src = text_source(_ui)
+    text = TEXT[src].get(key) if src in TEXT else None
+    if text is None and src not in HANDWRITTEN:
+        from . import uitext
+        text = uitext.lookup(src, key)
+    text = text or TEXT["en"][key]
+    if not kw:
+        return text
+    try:
+        return text.format(**kw)
+    except (KeyError, IndexError, ValueError):
+        return TEXT["en"][key].format(**kw)         # a machine translation that lost a placeholder never breaks the window
 
 
 # Target languages offered in the window: the ones that have a translation model (checked against the live Argos index
 # when it can be reached; this is the list as of the last check). Portuguese is split into Brazil and Portugal.
-SUPPORTED_TARGETS = ["pt-BR", "pt-PT", "en", "es", "fr", "de", "it", "ru", "pl", "tr", "uk", "zh", "ja", "ko", "nl", "cs",
-                     "ar", "az", "bg", "bn", "ca", "da", "el", "eo", "et", "eu", "fa", "fi", "ga", "gl", "he", "hi", "hu", "id",
-                     "ky", "lt", "lv", "ms", "nb", "ro", "sk", "sl", "sq", "sv", "sw", "th", "tl", "ur", "vi"]
+SUPPORTED_TARGETS = list(GAME_LANGS)
 
-# Language names: code -> (English, Portuguese, native). Shown in full, in the window language, with the native name.
+# Language names: code -> (English, Portuguese, native), as RimWorld's own language list names them.
 NAMES = {
-    "en": ("English", "Inglês", "English"), "pt": ("Portuguese", "Português", "Português"),
-    "pt-BR": ("Portuguese (Brazil)", "Português (Brasil)", "Português (Brasil)"),
+    "ca": ("Catalan", "Catalão", "Català"),
+    "zh": ("Chinese (Simplified)", "Chinês (Simplificado)", "简体中文"),
+    "zh-Hant": ("Chinese (Traditional)", "Chinês (Tradicional)", "繁體中文"),
+    "cs": ("Czech", "Tcheco", "Čeština"),
+    "da": ("Danish", "Dinamarquês", "Dansk"),
+    "nl": ("Dutch", "Holandês", "Nederlands"),
+    "en": ("English", "Inglês", "English"),
+    "et": ("Estonian", "Estoniano", "Eesti"),
+    "fi": ("Finnish", "Finlandês", "Suomi"),
+    "fr": ("French", "Francês", "Français"),
+    "de": ("German", "Alemão", "Deutsch"),
+    "el": ("Greek", "Grego", "Ελληνικά"),
+    "hu": ("Hungarian", "Húngaro", "Magyar"),
+    "it": ("Italian", "Italiano", "Italiano"),
+    "ja": ("Japanese", "Japonês", "日本語"),
+    "ko": ("Korean", "Coreano", "한국어"),
+    "ko-FC": ("Korean (Fast Channel)", "Coreano (Fast Channel)", "한국어 (Fast Channel)"),
+    "nb": ("Norwegian (Bokmål)", "Norueguês (Bokmål)", "Norsk bokmål"),
+    "pl": ("Polish", "Polonês", "Polski"),
     "pt-PT": ("Portuguese (Portugal)", "Português (Portugal)", "Português (Portugal)"),
-    "az": ("Azerbaijani", "Azerbaijano", "Azərbaycanca"), "bg": ("Bulgarian", "Búlgaro", "Български"),
-    "bn": ("Bengali", "Bengali", "বাংলা"), "eo": ("Esperanto", "Esperanto", "Esperanto"),
-    "et": ("Estonian", "Estoniano", "Eesti"), "eu": ("Basque", "Basco", "Euskara"),
-    "fa": ("Persian", "Persa", "فارسی"), "ga": ("Irish", "Irlandês", "Gaeilge"),
-    "gl": ("Galician", "Galego", "Galego"), "ky": ("Kyrgyz", "Quirguiz", "Кыргызча"),
-    "lt": ("Lithuanian", "Lituano", "Lietuvių"), "lv": ("Latvian", "Letão", "Latviešu"),
-    "ms": ("Malay", "Malaio", "Bahasa Melayu"), "sl": ("Slovenian", "Esloveno", "Slovenščina"),
-    "sq": ("Albanian", "Albanês", "Shqip"), "sw": ("Swahili", "Suaíli", "Kiswahili"),
-    "tl": ("Tagalog", "Tagalo", "Tagalog"), "ur": ("Urdu", "Urdu", "اردو"),
-    "es": ("Spanish", "Espanhol", "Español"), "fr": ("French", "Francês", "Français"),
-    "de": ("German", "Alemão", "Deutsch"), "it": ("Italian", "Italiano", "Italiano"),
-    "ru": ("Russian", "Russo", "Русский"), "uk": ("Ukrainian", "Ucraniano", "Українська"),
-    "pl": ("Polish", "Polonês", "Polski"), "tr": ("Turkish", "Turco", "Türkçe"),
-    "cs": ("Czech", "Tcheco", "Čeština"), "nl": ("Dutch", "Holandês", "Nederlands"),
-    "hu": ("Hungarian", "Húngaro", "Magyar"), "sv": ("Swedish", "Sueco", "Svenska"),
-    "da": ("Danish", "Dinamarquês", "Dansk"), "fi": ("Finnish", "Finlandês", "Suomi"),
-    "nb": ("Norwegian", "Norueguês", "Norsk"), "el": ("Greek", "Grego", "Ελληνικά"),
-    "ro": ("Romanian", "Romeno", "Română"), "sk": ("Slovak", "Eslovaco", "Slovenčina"),
-    "ca": ("Catalan", "Catalão", "Català"), "ja": ("Japanese", "Japonês", "日本語"),
-    "ko": ("Korean", "Coreano", "한국어"), "zh": ("Chinese", "Chinês", "中文"),
-    "ar": ("Arabic", "Árabe", "العربية"), "he": ("Hebrew", "Hebraico", "עברית"),
-    "hi": ("Hindi", "Hindi", "हिन्दी"), "id": ("Indonesian", "Indonésio", "Bahasa Indonesia"),
-    "th": ("Thai", "Tailandês", "ไทย"), "vi": ("Vietnamese", "Vietnamita", "Tiếng Việt"),
+    "pt-BR": ("Portuguese (Brazil)", "Português (Brasil)", "Português (Brasil)"),
+    "ro": ("Romanian", "Romeno", "Română"),
+    "ru": ("Russian", "Russo", "Русский"),
+    "sk": ("Slovak", "Eslovaco", "Slovenčina"),
+    "es": ("Spanish (Castilian)", "Espanhol (Castelhano)", "Español (Castellano)"),
+    "es-419": ("Spanish (Latin America)", "Espanhol (América Latina)", "Español (Latinoamérica)"),
+    "sv": ("Swedish", "Sueco", "Svenska"),
+    "tr": ("Turkish", "Turco", "Türkçe"),
+    "uk": ("Ukrainian", "Ucraniano", "Українська"),
+    "vi": ("Vietnamese", "Vietnamita", "Tiếng Việt"),
 }
 
 
@@ -343,7 +382,7 @@ def lang_label(code, ui):
     n = NAMES.get(code)
     if not n:
         return code
-    name = n[1] if ui == "pt" else n[0]
+    name = n[1] if text_source(ui) == "pt" else n[0]
     return name if name == n[2] else f"{name} ({n[2]})"
 
 

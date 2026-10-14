@@ -182,12 +182,23 @@ class Window(unittest.TestCase):
         # without a saved choice the SYSTEM language decides
         cfg = i18n.data_dir() / "config.json"
         cfg.unlink()
-        for sysl, expected in (("pt", "pt"), ("en", "en"), ("es", "en"), (None, "en")):
+        for sysl, expected in (("pt", "pt-BR"), ("es", "es"), ("xx", "en"), (None, "en")):
             languages.system_language, orig = (lambda v=sysl: v), languages.system_language
             try:
                 self.assertEqual(i18n.current(), expected, f"system={sysl}")
             finally:
                 languages.system_language = orig
+
+    def test_window_language_picker_lists_the_rimworld_languages(self):
+        from rwtranslate import i18n
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        values = set(app.ui_box.cget("values"))
+        self.assertEqual(len(values), 30)
+        self.assertIn("Deutsch - German", values)
+        self.assertIn("Português (Brasil) - Portuguese (Brazil)", values)
+        self.assertEqual(set(app.lang_codes.values()), set(i18n.SUPPORTED_TARGETS))     # the target list is the same 30
+        app.set_lang("fr")                                      # not translated yet (no model in tests): English until it is ready
+        self.assertEqual(str(app.btn_quit.cget("text")), "Quit")
 
     def test_every_text_exists_in_both_languages(self):
         from rwtranslate import i18n

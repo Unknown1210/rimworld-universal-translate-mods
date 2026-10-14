@@ -16,14 +16,14 @@ namespace AutoTranslate
         {
             {"english","en"},
             {"portuguese","pt-PT"},{"portugues","pt-PT"},{"portuguesebrazilian","pt-BR"},{"portuguesbrasileiro","pt-BR"},
-            {"spanish","es"},{"spanishlatin","es"},{"espanol","es"},{"espanollatino","es"},
+            {"spanish","es"},{"espanol","es"},{"espanolcastellano","es"},{"spanishlatin","es-419"},{"espanollatino","es-419"},{"espanollatinoamerica","es-419"},
             {"french","fr"},{"francais","fr"},{"german","de"},{"deutsch","de"},{"italian","it"},{"italiano","it"},
             {"russian","ru"},{"russkij","ru"},{"polish","pl"},{"polski","pl"},{"turkish","tr"},{"turkce","tr"},
             {"ukrainian","uk"},{"czech","cs"},{"cestina","cs"},{"dutch","nl"},{"nederlands","nl"},
-            {"hungarian","hu"},{"magyar","hu"},{"japanese","ja"},{"korean","ko"},
-            {"chinesesimplified","zh"},{"chinese","zh"},{"chinesetraditional","zh"},
-            {"danish","da"},{"finnish","fi"},{"swedish","sv"},{"norwegian","nb"},{"greek","el"},{"romanian","ro"},
-            {"slovak","sk"},{"catalan","ca"},{"arabic","ar"},{"hebrew","he"},{"indonesian","id"},{"thai","th"},{"vietnamese","vi"},
+            {"hungarian","hu"},{"magyar","hu"},{"japanese","ja"},{"korean","ko"},{"koreanfastchannel","ko-FC"},
+            {"chinesesimplified","zh"},{"chinese","zh"},{"chinesetraditional","zh-Hant"},
+            {"danish","da"},{"dansk","da"},{"estonian","et"},{"finnish","fi"},{"swedish","sv"},{"norwegian","nb"},{"greek","el"},{"romanian","ro"},
+            {"slovak","sk"},{"catalan","ca"},{"vietnamese","vi"},{"norwegianbokmal","nb"},{"norsk","nb"},{"arabic","ar"},{"hebrew","he"},{"indonesian","id"},{"thai","th"},
         };
 
         static string Norm(string s)
@@ -43,6 +43,8 @@ namespace AutoTranslate
             string c = code.Trim().Replace('_', '-').ToLowerInvariant();
             if (c == "pt" || c == "pb" || c == "pt-br") return "pt-BR";
             if (c == "pt-pt") return "pt-PT";
+            if (c == "zh-hant") return "zh-Hant";
+            if (c == "ko-fc") return "ko-FC";
             return c;
         }
 
@@ -62,7 +64,7 @@ namespace AutoTranslate
         public static string ModelCode(string code)
         {
             string c = (code ?? "").Replace('_', '-').ToLowerInvariant();
-            return c == "pt-br" ? "pb" : c == "pt-pt" ? "pt" : code;
+            return c == "pt-br" ? "pb" : c == "pt-pt" ? "pt" : c == "zh-hant" ? "zt" : c == "es-419" ? "es" : c == "ko-fc" ? "ko" : code;
         }
 
         public static string FromName(string name)

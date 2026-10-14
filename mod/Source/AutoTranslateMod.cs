@@ -76,17 +76,25 @@ namespace AutoTranslate
                 bool off = Pipeline.Suspended;
                 l.Label(off ? "<color=#ffb347>" + T.Get("AT_Off") + "</color>" : "<color=#88dd88>" + T.Get("AT_On") + "</color>");
                 if (l.ButtonText(off ? T.Get("AT_BtnOn") : T.Get("AT_BtnOff"))) Safe.Run("switch", () => Pipeline.SetSuspended(!off));
-                // the shortcut: one key plus optional Shift / Ctrl / Alt, switches the translations in real time while playing
-                l.Label(Hotkey.Capturing ? "<color=#ffd966>" + T.Get("AT_HotkeyPress") + "</color>" : T.Get("AT_Hotkey", Hotkey.Label(Settings)));
-                if (l.ButtonText(Hotkey.Capturing ? T.Get("AT_BtnHotkeyCancel") : T.Get("AT_BtnHotkeySet"))) Hotkey.Capturing = !Hotkey.Capturing;
-                if (!string.IsNullOrEmpty(Settings.hotkeyKey) && l.ButtonText(T.Get("AT_BtnHotkeyClear"))) Safe.Run("hotkey", Hotkey.Clear);
-                l.Gap(4f);
-                // 2) the target language is chosen once, in the translator program
-                l.Label(TargetLine());
-                // 3) what is going on
-                l.Label(Pipeline.StatusUi);
+                // the shortcut: one key plus optional Shift / Ctrl / Alt, switches the translations in real time while playing.
+                // One row: the text on the left, "set" and "remove" side by side on the right (saves lines for the mod list).
+                Rect hk = l.GetRect(30f);
+                float bw = Math.Min(170f, hk.width * 0.26f);
+                Widgets.Label(new Rect(hk.x, hk.y + 4f, hk.width - bw * 2f - 12f, hk.height - 4f),
+                    Hotkey.Capturing ? "<color=#ffd966>" + T.Get("AT_HotkeyPress") + "</color>" : T.Get("AT_Hotkey", Hotkey.Label(Settings)));
+                bool hasKey = !string.IsNullOrEmpty(Settings.hotkeyKey);
+                if (Widgets.ButtonText(new Rect(hk.x + hk.width - bw * 2f - 6f, hk.y, bw, 28f), Hotkey.Capturing ? T.Get("AT_BtnHotkeyCancel") : T.Get("AT_BtnHotkeySet"))) Hotkey.Capturing = !Hotkey.Capturing;
+                if (hasKey && Widgets.ButtonText(new Rect(hk.x + hk.width - bw, hk.y, bw, 28f), T.Get("AT_BtnHotkeyClear"))) Safe.Run("hotkey", Hotkey.Clear);
+                l.Gap(2f);
+                // 2) target language (chosen once, in the translator program) and 3) what is going on: one paragraph
+                string status = TargetLine() + "  " + Pipeline.StatusUi;
                 if (!string.IsNullOrEmpty(HelperClient.LastError) && Pipeline.StatusKey != "ready" && Pipeline.StatusKey != "done")
-                    l.Label(T.Get("AT_HelperProblem", HelperClient.LastError));
+                {
+                    string err = HelperClient.LastError.Replace("\r", " ").Replace("\n", " ").Trim();
+                    if (err.Length > 90) err = err.Substring(0, 90).TrimEnd() + "...";      // the full text is in the log / "Check the translator" in the advanced options
+                    status += "\n" + T.Get("AT_HelperProblem", err);
+                }
+                l.Label(status);
                 int problems = 0;
                 foreach (ModState pm in Pipeline.Mods) if (pm.AutoDisabled) problems++;
                 if (problems > 0) l.Label("<color=#ff6666>" + T.Get("AT_Banner", problems) + "</color>");

@@ -7,7 +7,7 @@
     <li>1.6</li>
   </supportedVersions>
   <description>
-UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.010): expect bugs, and report them.
+UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.011): expect bugs, and report them.
 
 WHAT IT DOES
 Automatically translates the OTHER mods you have installed (names, descriptions, interface texts and the descriptions on this Mods screen) into the language you choose. It detects each mod's language by itself (English, Chinese, Russian...). Texts that already have a translation, from the mod itself or from a translation mod, are left alone. If one mod causes a problem, only that mod is switched off.
@@ -30,7 +30,7 @@ Nothing is sent over the internet except the one-time model download and the upd
 
 ----------------------------------------
 
-EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.010): podem existir erros, avise.
+EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.011): podem existir erros, avise.
 
 O QUE FAZ
 Traduz automaticamente os OUTROS mods que você instalou (nomes, descrições, textos de interface e as descrições desta tela de Mods) para o idioma que você escolher. Detecta sozinho o idioma de cada mod (inglês, chinês, russo...). Textos que já têm tradução, do próprio mod ou de um mod de tradução, não são mexidos. Se um mod der problema, só ele é desligado.

@@ -1,13 +1,15 @@
 <h1 align="center">Universal Translate for RimWorld</h1>
 
+<p align="center"><b>🇧🇷 Português</b> · <a href="README.en.md">🇺🇸 English</a></p>
+
 <div align="justify">
 
-**Versão atual: 0.010** · [Baixar na aba Releases](../../releases/latest)
+**Versão atual: 0.011** · [Baixar na aba Releases](../../releases/latest)
 
 Traduz **automaticamente** os outros mods do seu jogo para o seu idioma, **sem precisar de um mod de tradução para cada mod**.
 A tradução é feita **no seu computador, sem internet e de graça**. Cada tradução fica salva, então ela só é feita uma vez.
 
-> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.010). Veja "Estado atual" abaixo.
+> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.011). Veja "Estado atual" abaixo.
 
 <h2 align="left">Compatibilidade</h2>
 
@@ -15,7 +17,7 @@ A tradução é feita **no seu computador, sem internet e de graça**. Cada trad
 <tr><td width="22%"><b>Jogo</b></td><td align="justify">RimWorld <b>1.6</b></td></tr>
 <tr><td width="22%"><b>Sistema</b></td><td align="justify"><b>Windows</b> 10/11</td></tr>
 <tr><td width="22%"><b>Idioma original dos mods</b></td><td align="justify"><b>Qualquer um</b>: o mod detecta sozinho (inglês, chinês, russo, português, ...)</td></tr>
-<tr><td width="22%"><b>Idioma de destino</b></td><td align="justify"><b>Todos os idiomas que têm modelo de tradução</b> (49): Português (Brasil), Português (Portugal), Inglês, Espanhol, Francês, Alemão, Italiano, Russo, Polonês, Turco, Ucraniano, Chinês, Japonês, Coreano, Holandês, Tcheco, Árabe, Azerbaijano, Búlgaro, Bengali, Catalão, Dinamarquês, Grego, Esperanto, Estoniano, Basco, Persa, Finlandês, Irlandês, Galego, Hebraico, Hindi, Húngaro, Indonésio, Quirguiz, Lituano, Letão, Malaio, Norueguês, Romeno, Eslovaco, Esloveno, Albanês, Sueco, Suaíli, Tailandês, Tagalo, Urdu, Vietnamita. O Português tem duas opções, <b>Português (Brasil)</b> e <b>Português (Portugal)</b>, cada uma com o seu próprio modelo. Os modelos são baixados sob demanda.</td></tr>
+<tr><td width="22%"><b>Idioma de destino</b></td><td align="justify"><b>Somente os 30 idiomas que o próprio RimWorld oferece</b>: Alemão, Catalão, Chinês (Simplificado), Chinês (Tradicional), Coreano, Coreano (Fast Channel), Dinamarquês, Eslovaco, Espanhol (Castelhano), Espanhol (América Latina), Estoniano, Finlandês, Francês, Grego, Holandês, Húngaro, Inglês, Italiano, Japonês, Norueguês (Bokmål), Polonês, Português (Brasil), Português (Portugal), Romeno, Russo, Sueco, Tcheco, Turco, Ucraniano e Vietnamita. Qualquer outro idioma não aparece. Cada um tem o seu modelo de tradução (as variantes de espanhol e de coreano usam o mesmo modelo), baixado sob demanda.</td></tr>
 </table>
 
 
@@ -35,11 +37,11 @@ Um mod do RimWorld é apenas um conjunto de arquivos que roda **dentro** do jogo
 Baixe os dois arquivos na aba **Releases** (lado direito desta página, versão mais nova):
 `UniversalTranslate-Helper.exe` (o programa que traduz) e `UniversalTranslate-Mod.zip` (o mod já pronto).
 
-1. Instale o mod **Harmony** pela Steam Workshop.<br><sub>────────────</sub>
+1. Instale o mod **Harmony** pela [Steam Workshop](https://steamcommunity.com/workshop/filedetails/?id=2009463077).<br><sub>────────────</sub>
 2. Extraia a pasta `AutoTranslate` do `UniversalTranslate-Mod.zip` para dentro de `RimWorld\Mods`.<br><sub>────────────</sub>
-3. Dê **dois cliques** em `UniversalTranslate-Helper.exe`. Vai abrir **uma janela** (sem janela preta; em português ou inglês, conforme o seu sistema, dá para trocar no canto).<br><sub>────────────</sub>
+3. Dê **dois cliques** em `UniversalTranslate-Helper.exe`. Vai abrir **uma janela**.<br><sub>────────────</sub>
 4. Na primeira vez: escolha o **idioma de destino** pelo nome (ele é escolhido **aqui, no executável**, e o jogo usa o mesmo) e espere o modelo baixar. **Deixe a janela aberta enquanto joga RimWorld.** Ela só é necessária enquanto algo estiver sendo traduzido durante o jogo: **se tudo já estiver traduzido, você não precisa mais dela e pode jogar com o programa fechado**. Atenção: textos que só existem dentro do jogo (como os botões de ações da aba Ordens que alguns mods criam em código) **não dá para traduzir antes**; para eles, abra o programa **antes** de iniciar o RimWorld e jogue com ele aberto, para que ele traduza e salve no cache. Nas próximas vezes já fica pronto. **Se você traduzir ou atualizar os mods com o jogo aberto e não vir a tradução aplicada, reinicie o jogo** para que ela seja aplicada. Abra de novo quando instalar mods novos ou atualizar algum.<br><sub>────────────</sub>
-5. Abra o RimWorld, ative **Harmony** e depois **Auto Translate** (nessa ordem) e inicie o jogo.<br><sub>────────────</sub>
+5. Abra o RimWorld, ative [**Harmony**](https://steamcommunity.com/workshop/filedetails/?id=2009463077) e depois **Auto Translate** (nessa ordem) e inicie o jogo.<br><sub>────────────</sub>
 6. Na primeira vez a tradução leva alguns minutos; nas próximas é instantânea. Se quiser adiantar, use a aba **Traduzir mods** do executável (veja abaixo). Os ajustes do mod ficam em **Opções → Mods → Auto Translate**.
 
 <h3 align="left">Aviso do Windows ao abrir o <code>.exe</code></h3>
@@ -53,9 +55,7 @@ O executável **ainda não tem assinatura digital** (certificado de publicador),
 <h2 align="left">Atualizar</h2>
 
 Abra o `UniversalTranslate-Helper.exe` e clique em **Procurar atualização**. Se houver versão nova, clique em **Atualizar agora**: ele baixa do GitHub, confere o arquivo, atualiza o executável **e o mod** (se achar a pasta do RimWorld; **feche o jogo antes**) e reinicia sozinho. Ele também procura atualização quando abre.
-- Só são aceitos arquivos do GitHub, e o arquivo baixado precisa bater com o hash (SHA-256) publicado na Release. Isso protege contra download corrompido, mas você continua confiando no repositório.<br><sub>────────────</sub>
-- Sem a janela: `UniversalTranslate-Helper.exe update` (use `--check` para só verificar).<br><sub>────────────</sub>
-- Se o repositório estiver **privado**, a verificação não funciona sem um token do GitHub (variável `RWTRANSLATE_GITHUB_TOKEN`). Com o repositório público funciona sem nada.
+- Só são aceitos arquivos do GitHub, e o arquivo baixado precisa bater com o hash (SHA-256) publicado na Release. Isso protege contra download corrompido, mas você continua confiando no repositório.
 
 <h2 align="left">Traduzir todos os mods de uma vez (aba "Traduzir mods", sem abrir o jogo)</h2>
 
@@ -83,10 +83,10 @@ Em **Opções → Mods → Auto Translate** (a tela segue o idioma do seu jogo):
 - **Desativar traduções:** um botão que mostra os textos originais **na hora, sem reiniciar**, para você comparar. Clique de novo para voltar às traduções.<br><sub>────────────</sub>
 - **Atalho de teclado:** clique em "Definir atalho" e aperte a tecla que quiser, sozinha ou com Shift, Ctrl ou Alt (por exemplo, Shift + Tab). Em qualquer momento do jogo, esse atalho liga e desliga as traduções **em tempo real**, com um aviso na tela. Escolha uma combinação que o jogo ainda não use. Não dispara enquanto você escreve em uma caixa de texto.<br><sub>────────────</sub>
 - **Idioma de destino:** é escolhido **no executável**; aqui só aparece qual está em uso. Se você trocar no executável com o jogo aberto, o mod percebe e recarrega sozinho.<br><sub>────────────</sub>
-- **Lista de mods:** para cada mod você vê o que está acontecendo e se há **suporte** para o idioma escolhido ("com suporte", "SEM SUPORTE" ou "desconhecido" se o programa tradutor estiver fechado). Cada mod tem um interruptor **Ativado** e a escolha de qual tradução usar: automática (recomendada), a do próprio mod, a de outro mod de tradução, ou sempre a automática.<br><sub>────────────</sub>
+- **Lista de mods:** para cada mod você vê o que está acontecendo e se há **suporte** para o idioma escolhido ("com suporte", "SEM SUPORTE" ou "desconhecido" se o programa tradutor estiver fechado). Cada mod tem um interruptor **Ativado** e a escolha de qual tradução usar: automática (recomendada), preferir a do próprio mod, preferir a de outro mod de tradução, ou sempre a automática. Nas opções "preferir", o que o mod escolhido não traz é traduzido automaticamente: nenhum texto fica em inglês por causa do modo.<br><sub>────────────</sub>
 - **Pesquisar mod:** uma caixa acima da lista filtra os mods pelo nome ou pelo identificador (o contador mostra, por exemplo, 3/64).<br><sub>────────────</sub>
-- **Aplicar a todos os exibidos:** um botão com menu para escolher de uma vez a tradução de todos os mods que aparecem na lista (use a pesquisa para escolher só um grupo): automática (recomendada), a do próprio mod, a de outro mod de tradução ou sempre a automática. Mods que você desligou, ou que foram desligados por problemas, não são mexidos. Vale quando você fecha a janela de opções.<br><sub>────────────</sub>
-- **Diagnóstico:** um botão em cada mod que copia um relatório curto (o estado do mod, quantos textos estão traduzidos e aplicados, quais estão esperando, se o arquivo de tradução tem aquele texto e se há um texto quase igual). Cole numa mensagem para descobrir por que um mod não está mostrando a tradução.<br><sub>────────────</sub>
+- **Aplicar a todos os exibidos:** um botão com menu para escolher de uma vez a tradução de todos os mods que aparecem na lista (use a pesquisa para escolher só um grupo): automática (recomendada), preferir a do próprio mod, preferir a de outro mod de tradução ou sempre a automática. Mods que você desligou, ou que foram desligados por problemas, não são mexidos. Vale quando você fecha a janela de opções.<br><sub>────────────</sub>
+- **Diagnóstico:** um botão em cada mod que copia um relatório curto (o estado do mod, quantos textos estão traduzidos e aplicados, quais estão esperando, se o arquivo de tradução tem aquele texto e se há um texto quase igual). Cole numa mensagem para descobrir por que um mod não está mostrando a tradução. Há também um botão que reúne o diagnóstico de todos os mods e salva num arquivo de texto.<br><sub>────────────</sub>
 - **Avançado** (recolhido): o que traduzir (itens, interface, descrições), esconder os textos com acentos estranhos do modo desenvolvedor (veja abaixo), log detalhado, pasta de logs, relatório de problema e limpar o cache.
 
 <h2 align="left">O que ele traduz (e o que não)</h2>
@@ -111,12 +111,12 @@ Com o **modo desenvolvedor** do RimWorld ligado, o próprio jogo marca os textos
 <h2 align="left">Privacidade e arquivos</h2>
 
 - **Nada é enviado pela internet.** A única coisa baixada é o modelo de tradução, uma vez (e as atualizações, se você clicar).<br><sub>────────────</sub>
-- **De onde vem o modelo:** do projeto aberto **Argos Translate**. A lista de modelos fica no GitHub dele e os arquivos são baixados de `argos-net.com`. É um download anônimo: **sem conta, sem login, sem chave e sem assinatura de nenhum serviço** (o programa não usa nenhuma IA online; quem traduz é o modelo, rodando no seu computador). Limite honesto: a lista do Argos não traz uma impressão digital (hash) dos modelos, então eles não são conferidos depois de baixados, só protegidos pela conexão segura (https).<br><sub>────────────</sub>
+- **De onde vem o modelo:** do projeto aberto [**Argos Translate**](https://github.com/argosopentech/argos-translate). A lista de modelos fica no GitHub dele e os arquivos são baixados de `argos-net.com`. É um download anônimo: **sem conta, sem login, sem chave e sem assinatura de nenhum serviço** (o programa não usa nenhuma IA online; quem traduz é o modelo, rodando no seu computador). Limite honesto: a lista do Argos não traz uma impressão digital (hash) dos modelos, então eles não são conferidos depois de baixados, só protegidos pela conexão segura (https).<br><sub>────────────</sub>
 - Tudo fica em `%LOCALAPPDATA%\RimWorldAutoTranslate`: modelos, traduções salvas (`cache`), suas correções (`overrides`) e logs (`logs`).
 
 <h2 align="left">Estado atual (transparência)</h2>
 
-Esta é uma **versão inicial** (versão atual 0.010), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. A tradução automática pode errar. Ainda **não foi validado**: a tradução com os modelos reais em mods de verdade (os testes usam tradutores falsos) e a tela do mod dentro do jogo.
+Esta é uma **versão inicial** (versão atual 0.011), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. **A tradução automática não é 100% perfeita**, mas é bem melhor do que jogar com um mod que não está no seu idioma. **Se você encontrar qualquer erro, por favor reporte** (veja "Deu problema ou conflito com um mod?" abaixo): isso ajuda a melhorar o projeto para todo mundo.
 
 <h2 align="left">Deu problema ou conflito com um mod?</h2>
 

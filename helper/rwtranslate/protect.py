@@ -111,4 +111,6 @@ def clean_output(source, translated, target):
             t = t[:i] + t[i].upper() + t[i + 1:]
         elif s[j].islower() and t[i].isupper() and target != "de" and not (len(t) > i + 1 and t[i + 1].isupper()):
             t = t[:i] + t[i].lower() + t[i + 1:]      # lowercase label; not for German nouns, not for acronyms ("HP")
+    if t.endswith(".") and not t.endswith("..") and len(t) < 60 and "\n" not in t and not s.rstrip().endswith((".", "!", "?", ":", ";", "…")):
+        t = t[:-1].rstrip()       # engines add a full stop to bare labels ("Safe" -> "Seguro.")
     return lead + t

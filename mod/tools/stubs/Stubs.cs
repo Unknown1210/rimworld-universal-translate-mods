@@ -166,6 +166,7 @@ namespace Verse
         public string TextEntry(string t) { return t; }
         public bool ButtonText(string l) { return false; }
         public void GapLine() { }
+        public UnityEngine.Rect GetRect(float h) { return new UnityEngine.Rect(0f, 0f, 100f, h); }
     }
     public class Window { }
     public class Dialog_MessageBox : Window

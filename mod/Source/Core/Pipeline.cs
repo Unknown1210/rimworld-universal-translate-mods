@@ -331,9 +331,11 @@ namespace AutoTranslate
                     return;
                 case ModMode.Native:
                     if (own != null) UseCover(ms, own, effective, origin, b);
+                    else QueueTranslation(ms, english(), origin, b);      // nothing of the mod's own: never leave the text untranslated
                     return;
                 case ModMode.Third:
                     if (third != null) UseCover(ms, third, effective, origin, b);
+                    else QueueTranslation(ms, english(), origin, b);      // nothing from another mod: translate it ourselves
                     return;
                 case ModMode.Mine:
                     {

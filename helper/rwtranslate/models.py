@@ -62,8 +62,14 @@ def available_targets(index=None):
             out.add("pt-BR")
         elif t == "pt":
             out.add("pt-PT")
+        elif t == "zt":
+            out.add("zh-Hant")
         else:
             out.add(t)
+            if t == "es":
+                out.add("es-419")          # Latin American Spanish uses the same model
+            elif t == "ko":
+                out.add("ko-FC")
     return sorted(out)
 
 

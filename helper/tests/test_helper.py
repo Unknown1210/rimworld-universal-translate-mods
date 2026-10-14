@@ -69,7 +69,7 @@ class Lang(unittest.TestCase):
         self.assertEqual(languages.code_from_game_language("PortugueseBrazilian"), "pt-BR")
         self.assertEqual(languages.code_from_game_language("Português"), "pt-PT")
         self.assertEqual(languages.code_from_game_language("Portuguese"), "pt-PT")
-        self.assertEqual(languages.code_from_game_language("Español Latino"), "es")
+        self.assertEqual(languages.code_from_game_language("Español Latino"), "es-419")
         self.assertEqual(languages.code_from_game_language("English"), "en")
         self.assertIsNone(languages.code_from_game_language("Klingon"))
 
@@ -256,6 +256,74 @@ class CleanOutput(unittest.TestCase):
         self.assertEqual(protect.clean_output("hit points", "HP total", "pt"), "HP total")
         self.assertEqual(protect.clean_output("table", "Tisch", "de"), "Tisch")
 
+    def test_bare_label_gets_no_full_stop(self):
+        self.assertEqual(protect.clean_output("safe", "Seguro.", "pt"), "seguro")
+        self.assertEqual(protect.clean_output("A safe.", "Um cofre.", "pt"), "Um cofre.")
+        self.assertEqual(protect.clean_output("wait...", "espere...", "pt"), "espere...")
+
+    def test_glossary_fixes_ambiguous_label(self):
+        set_engine("en", "pt", type("E", (), {"translate_batch": staticmethod(lambda ts: ["Seguro." for _ in ts])})())
+        self.assertEqual(server.translate_texts("en", "pt", ["safe", "Safe"]), ["cofre", "Cofre"])
+        self.assertEqual(server.translate_texts("en", "pt-BR", ["safe"]), ["cofre"])
+        self.assertEqual(server.translate_texts("en", "pt", ["safe room"]), ["seguro"])     # only whole-text matches
+
     def test_server_applies_it(self):
         set_engine("en", "pt", type("E", (), {"translate_batch": staticmethod(lambda ts: ["▁Mesa▁elétrica" for _ in ts])})())
         self.assertEqual(server.translate_texts("en", "pt", ["electric table"]), ["mesa elétrica"])
+
+
+class WindowLanguages(unittest.TestCase):
+    def setUp(self):
+        from rwtranslate import i18n, uitext
+        self.i18n, self.uitext = i18n, uitext
+        uitext.forget()
+
+    def test_the_window_offers_exactly_the_rimworld_languages(self):
+        self.assertEqual(len(self.i18n.UI_LANGS), 30)
+        self.assertEqual(set(self.i18n.UI_LANGS), set(self.i18n.NAMES))
+        self.assertEqual(self.i18n.SUPPORTED_TARGETS, list(self.i18n.UI_LANGS))
+        for c in ("ca", "zh", "zh-Hant", "ko-FC", "nb", "es-419", "pt-PT", "pt-BR", "vi", "uk"):
+            self.assertIn(c, self.i18n.UI_LANGS)
+        for c in ("ar", "hi", "th", "he", "id", "fa"):                 # languages RimWorld does not offer
+            self.assertNotIn(c, self.i18n.UI_LANGS)
+
+    def test_variants_share_texts_and_models(self):
+        self.assertEqual(self.i18n.text_source("pt-PT"), "pt")
+        self.assertEqual(self.i18n.text_source("pt-BR"), "pt")
+        self.assertEqual(self.i18n.text_source("es-419"), "es")
+        self.assertEqual(self.i18n.text_source("ko-FC"), "ko")
+        self.assertEqual(languages.model_code("zh-Hant"), "zt")
+        self.assertEqual(languages.model_code("es-419"), "es")
+        self.assertEqual(languages.norm_target("ZH-hant"), "zh-Hant")
+        self.assertTrue(server._code_ok("zh-Hant") and server._code_ok("es-419") and server._code_ok("ko-FC"))
+
+    def test_handwritten_languages_need_no_translation(self):
+        self.assertEqual(self.i18n.tr("pt-BR", "quit_btn"), "Sair")
+        self.assertEqual(self.i18n.tr("pt-PT", "quit_btn"), "Sair")
+        self.assertEqual(self.i18n.tr("en", "quit_btn"), "Quit")
+
+    def test_other_languages_are_translated_once_and_cached(self):
+        calls = []
+
+        def fake_de(texts):
+            calls.append(len(texts))
+            return ["DE:" + t for t in texts]
+        set_engine("en", "de", type("E", (), {"translate_batch": staticmethod(fake_de)})())
+        self.assertEqual(self.i18n.tr("de", "quit_btn"), "Quit")                       # not ready yet: English
+        self.assertEqual(len(self.uitext.pending("de")), len(self.i18n.TEXT["en"]))
+        n = self.uitext.translate_missing("de")
+        self.assertEqual(n, len(self.i18n.TEXT["en"]))
+        self.assertEqual(self.i18n.tr("de", "quit_btn"), "DE:Quit")
+        # placeholders survive and are filled in
+        self.assertIn("{n}", self.i18n.TEXT["en"]["det_tab_translated"])
+        self.assertIn("(7)", self.i18n.tr("de", "det_tab_translated", n=7))
+        # a second run, also after a restart (memory dropped), translates nothing
+        self.uitext.forget()
+        self.assertEqual(self.uitext.pending("de"), [])
+        self.assertEqual(self.uitext.translate_missing("de"), 0)
+
+    def test_a_careless_engine_cannot_break_placeholders(self):
+        set_engine("en", "fr", type("E", (), {"translate_batch": staticmethod(lambda ts: ["x" for _ in ts])})())
+        self.uitext.translate_missing("fr")
+        txt = self.i18n.tr("fr", "det_tab_translated", n=3)           # the marker is protected from the engine, so formatting works
+        self.assertTrue(txt.endswith("3)"), txt)

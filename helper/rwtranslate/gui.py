@@ -14,12 +14,20 @@ import time
 import webbrowser
 from pathlib import Path
 
-from . import __version__, activity, bulk, config, diagnostics, i18n, languages, logsetup, models, server, updater
+from . import __version__, activity, bulk, config, diagnostics, i18n, languages, logsetup, models, server, uitext, updater
 from .paths import logs_dir
 
 log = logsetup.get("gui")
 ISSUES_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods/issues/new?labels=bug"
-UI_NAMES = {"pt": "Português", "en": "English"}
+def ui_name(code):
+    """Window language as the picker shows it: its own name first, the English name after it ("Deutsch - German")."""
+    n = i18n.NAMES.get(code)
+    if not n:
+        return code
+    return n[2] if n[2] == n[0] else f"{n[2]} - {n[0]}"
+
+
+UI_NAMES = {c: ui_name(c) for c in i18n.UI_LANGS}
 SUPPORTED_TARGETS = i18n.SUPPORTED_TARGETS
 
 
@@ -75,6 +83,7 @@ class App:
         self.mod_dirs_override = mod_dirs                  # tests; None = detect Steam folders
         self.restart_fn = restart or self._restart
         self.lang = lang or i18n.current()
+        self.ui_job = None                                 # language whose window texts are being prepared (translated) in the background
         self.q = queue.Queue()
         self.latest = None
         self.busy = False
@@ -98,8 +107,11 @@ class App:
         bar.columnconfigure(0, weight=1)
         self.lbl_ui = ttk.Label(bar)
         self.lbl_ui.grid(row=0, column=1, padx=(0, 6))
-        self.ui_box = ttk.Combobox(bar, width=10, state="readonly", values=[UI_NAMES[c] for c in i18n.UI_LANGS])
-        self.ui_box.set(UI_NAMES[self.lang])
+        self.lbl_ui_note = ttk.Label(bar, foreground="#777777")
+        self.lbl_ui_note.grid(row=0, column=0, sticky="e", padx=(0, 10))
+        ui_values = sorted(UI_NAMES.values(), key=lambda n: n.lower())
+        self.ui_box = ttk.Combobox(bar, width=28, state="readonly", values=ui_values)
+        self.ui_box.set(UI_NAMES.get(self.lang, self.lang))
         self.ui_box.grid(row=0, column=2)
         self.ui_box.bind("<<ComboboxSelected>>", self.on_ui_lang)
 
@@ -126,6 +138,7 @@ class App:
         self.render_log()
         self.start_check()
         self.refresh_plan()
+        self.prepare_ui_texts()
 
     # ------------------------------------------------------------------ construction
     def field(self, parent, row, pady=(0, 2), color=None, sticky="ew"):
@@ -462,6 +475,38 @@ class App:
         i18n.save_choice(code)
         self.ui_box.set(UI_NAMES.get(code, code))
         self.apply_language()
+        self.prepare_ui_texts()
+
+    def prepare_ui_texts(self):
+        """Window languages other than Portuguese/English are machine-translated from the English texts with the program's own
+        models (downloaded first when needed) and cached. Meanwhile the window stays in English; it redraws when the texts are ready."""
+        src = i18n.text_source(self.lang)
+        if src in i18n.HANDWRITTEN or not uitext.pending(src):
+            self.lbl_ui_note.configure(text="")
+            return
+        if self.ui_job == src:
+            return
+        self.ui_job = src
+        lang = self.lang
+        self.lbl_ui_note.configure(text=i18n.tr("en", "ui_preparing"))
+
+        def work():
+            models.install("en", src, progress=lambda m: None)
+            return uitext.translate_missing(src)
+
+        def done(n, err):
+            self.ui_job = None
+            if i18n.text_source(self.lang) != src:
+                self.prepare_ui_texts()                    # the user already picked another language
+                return
+            if err is not None:
+                log.warning("window texts for %s not prepared: %s", src, err)
+                self.lbl_ui_note.configure(text=i18n.tr("en", "ui_prepare_failed"))
+                return
+            self.lbl_ui_note.configure(text="")
+            self.apply_language()
+
+        self.run_bg(work, done)
 
     # ------------------------------------------------------------------ thread -> UI plumbing
     def post(self, fn):
