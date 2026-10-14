@@ -102,6 +102,9 @@ public static class Harness
         Scenario12_ModListTools(home);
         Scenario13_ReloadsKeepEverythingEnglishAsSource(home);
         Scenario14_GameGeneratedTextsDoNotDecideTheLanguage(home);
+        Scenario15_UntranslatedCopyFileWithShortLabels(home);
+        Scenario16_MakeRecipes(home);
+        Scenario17_NeverTranslateATranslation(home);
 
         // ---- Crash report + log content
         string crash = CrashReporter.WriteReport("test", new InvalidOperationException("outer", new ArgumentException("inner cause")));
@@ -468,6 +471,89 @@ public static class Harness
         Pipeline.SetSuspended(true);
         Check(armchair.description == "A large, soft, comfy seat." && couch.description == "Um sofá macio para dois colonos.", "OFF restores exactly what the game had");
         Pipeline.SetSuspended(false);
+    }
+
+    static void Scenario15_UntranslatedCopyFileWithShortLabels(string home)
+    {
+        Console.WriteLine("== scenario 15: a 'Portuguese' file that is a copy of the English text, short labels included, and the game cannot tell us the original");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "cp", "m"), Name = "Copy Mod", PackageIdPlayerFacing = "c.copy" };
+        WriteXml(Path.Combine(mod.RootDir, "Languages/PortugueseBrazilian/DefInjected/ThingDef/furniture.xml"),
+            "<MF_Bed.label>MF Bed</MF_Bed.label><MF_Chair.label>MF Chair</MF_Chair.label><MF_LargeGen.label>MF Large Generator</MF_LargeGen.label>"
+            + "<MF_DoubleBed.label>MF Double Bed</MF_DoubleBed.label><MF_DoubleBed.description>A simple double-wide bed that fits two people.</MF_DoubleBed.description>"
+            + "<MF_FloodLight.description>A high-intensity light that is good for large outdoor spaces and for the colony.</MF_FloodLight.description>");
+        var bed = new ThingDef { defName = "MF_Bed", label = "MF Bed", description = "A simple bed." };
+        var chair = new ThingDef { defName = "MF_Chair", label = "MF Chair", description = "A comfortable chair for the colonists." };
+        var gen = new ThingDef { defName = "MF_LargeGen", label = "MF Large Generator", description = "A generator that is big." };
+        var dbl = new ThingDef { defName = "MF_DoubleBed", label = "MF Double Bed", description = "A simple double-wide bed that fits two people." };
+        mod.defs.AddRange(new[] { bed, chair, gen, dbl });
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };     // no replacedString: the original English is unknown
+        Run("pt");
+        Check(gen.label == "MF Large Generator (pt)" && bed.label == "MF Bed (pt)" && dbl.label == "MF Double Bed (pt)",
+              "short labels of an untranslated copy file are translated: '" + gen.label + "', '" + bed.label + "'");
+        Check(dbl.description == "A simple double-wide bed that fits two people. (pt)", "and so is its description: '" + dbl.description + "'");
+        Check(Mod("c.copy").Native == 0, "none of it counts as a real own translation (" + Mod("c.copy").StatusText() + ")");
+    }
+
+    static void Scenario17_NeverTranslateATranslation(string home)
+    {
+        Console.WriteLine("== scenario 17: the game runs in Spanish with a Spanish translation of an English mod; the player asks for Portuguese: the ORIGINAL English is the source");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "nt", "m"), Name = "Translated Mod", PackageIdPlayerFacing = "n.once" };
+        // the game already replaced the English fields by the Spanish translation shipped with the mod
+        var barrow = new ThingDef { defName = "Barrow", label = "carretilla de mano", description = "Una carretilla resistente para llevar piedras y madera por la colonia, sin esfuerzo." };
+        var plain = new ThingDef { defName = "Plain", label = "plain tool", description = "A plain tool that was never translated into Spanish by the author of the mod." };
+        mod.defs.AddRange(new[] { barrow, plain });
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        var es = new LoadedLanguage { folderName = "Spanish" };
+        var pkg = new DefInjectionPackage { defType = typeof(ThingDef) };
+        pkg.injections["Barrow.label"] = new DefInjectionPackage.DefInjection { replacedString = "wheelbarrow" };
+        pkg.injections["Barrow.description"] = new DefInjectionPackage.DefInjection { replacedString = "A sturdy wheelbarrow to carry stone and wood around the colony without effort." };
+        es.defInjections.Add(pkg);
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = es;
+        Run("pt");
+        Check(!Pipeline.GameIsTarget, "the game is not in the target language");
+        Check(barrow.label == "wheelbarrow (pt)", "the source is the original English, not the Spanish translation: '" + barrow.label + "'");
+        Check(barrow.description == "A sturdy wheelbarrow to carry stone and wood around the colony without effort. (pt)", "same for the description: '" + barrow.description + "'");
+        Check(plain.label == "plain tool (pt)", "an untouched English text is translated as before");
+    }
+
+    static void Scenario16_MakeRecipes(string home)
+    {
+        Console.WriteLine("== scenario 16: 'Make X' bills the game built from item labels follow the translated item (\"Fazer throwing dagger Belt\")");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "mk", "m"), Name = "Make Mod", PackageIdPlayerFacing = "k.make" };
+        var belt = new ThingDef { defName = "Belt", label = "throwing dagger belt", description = "A belt that carries throwing daggers for quick use in a fight." };
+        var kit = new ThingDef { defName = "Kit", label = "repair kit", description = "A kit that is used to repair damaged things on the colony map." };
+        mod.defs.AddRange(new[] { belt, kit });
+        var lang = new LoadedLanguage { folderName = "PortugueseBrazilian" };
+        lang.keyedReplacements["RecipeMake"] = new LoadedLanguage.KeyedReplacement { key = "RecipeMake", value = "Fazer {0}" };
+        lang.keyedReplacements["RecipeMakeJobString"] = new LoadedLanguage.KeyedReplacement { key = "RecipeMakeJobString", value = "Fazendo {0}." };
+        // what the game built BEFORE the translation: its own words around the English item label
+        var makeBelt = new RecipeDef { defName = "Make_Belt", label = "Fazer throwing dagger belt", jobString = "Fazendo throwing dagger belt.", generated = true };
+        var makeKit = new RecipeDef { defName = "Make_Kit", label = "Fazer repair kit", jobString = "Fazendo repair kit.", generated = true };
+        // a generated recipe made by a mod, all English, with the batch size in it
+        var batch = new RecipeDef { defName = "Make_Medicine_x5", label = "Make medicine x5", generated = true };
+        mod.defs.AddRange(new Def[] { makeBelt, makeKit, batch });
+        DefDatabase<RecipeDef>.list.Clear();
+        DefDatabase<RecipeDef>.list.AddRange(new[] { makeBelt, makeKit });
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = lang;
+        Run("pt");
+        Check(belt.label == "throwing dagger belt (pt)", "the item is translated: " + belt.label);
+        Check(makeBelt.label == "Fazer throwing dagger belt (pt)" && makeKit.label == "Fazer repair kit (pt)",
+              "the bill follows the item, with the game's own 'Fazer' (no 'Fazer ... Belt' left in English): '" + makeBelt.label + "', '" + makeKit.label + "'");
+        Check(makeBelt.jobString == "Fazendo throwing dagger belt (pt).", "and the job text too: '" + makeBelt.jobString + "'");
+        Check(batch.label == "Fazer medicine x5 (pt)", "an English 'Make ... x5' bill made by a mod is translated and gets the game's 'Fazer': '" + batch.label + "'");
+        Pipeline.SetSuspended(true);
+        Check(belt.label == "throwing dagger belt" && makeBelt.label == "Fazer throwing dagger belt" && batch.label == "Make medicine x5",
+              "OFF restores the bill as the game had it: '" + makeBelt.label + "', '" + batch.label + "'");
+        Pipeline.SetSuspended(false);
+        DefDatabase<RecipeDef>.list.Clear();
     }
 
     sealed class TestDesignator : Designator { }

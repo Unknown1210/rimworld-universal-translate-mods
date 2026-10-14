@@ -98,6 +98,7 @@ namespace AutoTranslate
             AtLog.Info("pipeline", "target language: " + (Target ?? "none") + " (" + TargetHow + ")");
             if (Target == null) { SetStatus("idle"); return; }
             GameIsTarget = LangMap.FromGameLanguage(LanguageDatabase.activeLanguage) == Target;
+            makePrefixTried = false;
 
             cache = new TranslationCache(Target);
             if (!quitHooked) { Application.quitting += OnQuit; quitHooked = true; }
@@ -290,6 +291,7 @@ namespace AutoTranslate
         /// from translating (this is why a mod with an untranslated Portuguese folder stayed in English).</summary>
         static bool IsPlaceholder(ModState ms, Cover c, string original)
         {
+            if (c.FilePlaceholder) return true;                                   // the file as a whole is an untranslated copy
             string v = TranslationCache.Norm(c.Value);
             if (original != null && v == TranslationCache.Norm(original)) return true;
             string known;
@@ -402,7 +404,11 @@ namespace AutoTranslate
             {
                 Def d = def;
                 defs++;
-                if (d.generated && GameIsTarget && d is RecipeDef) continue;      // recipes the game made itself ("Fazer ISR2G", "Fazendo X.") are already in the game's language; making them "English" again gave "Fazenda ISR2G"
+                // "Make X" recipes the game builds from every craftable item ("Fazer faca"): the game's own words in ITS language around the
+                // item's label. Translating them as text made "Fazenda ISR2G"; they are rebuilt when the item's label is translated instead
+                // (RefreshMakeRecipe). A generated recipe still in English (made by a mod) is translated, keeping the game's "Fazer" in front.
+                string makePre = GameIsTarget && d is RecipeDef ? MakePrefix() : null;
+                if (d.generated && GameIsTarget && d is RecipeDef && (makePre == null || (d.label != null && d.label.StartsWith(makePre, StringComparison.Ordinal)))) continue;
                 try
                 {
                     foreach (FieldInfo f0 in FieldsFor(d.GetType()))
@@ -412,12 +418,21 @@ namespace AutoTranslate
                         if (string.IsNullOrWhiteSpace(cur)) continue;
                         var covers = index.ForDefField(d.GetType(), d.defName, f.Name);
                         string orig = cur;
+                        string pre = makePre != null && f.Name == "label" && cur.Length > 5 && cur.StartsWith("Make ", StringComparison.Ordinal) ? makePre : null;
                         var b = new Binding
                         {
-                            Apply = t => { f.SetValue(d, t); ResetDefCaches(d); },
-                            Revert = () => { f.SetValue(d, orig); ResetDefCaches(d); }
+                            Apply = t => { f.SetValue(d, pre != null && !t.StartsWith(pre, StringComparison.Ordinal) ? pre + t : t); ResetDefCaches(d); if (f.Name == "label") RefreshMakeRecipe(d); },
+                            Revert = () => { f.SetValue(d, orig); ResetDefCaches(d); if (f.Name == "label") RefreshMakeRecipe(d); }
                         };
-                        Func<string> english = () => covers != null && GameIsTarget ? ReplacedEnglish(d.GetType(), d.defName, f.Name) : cur;
+                        // The source is always the mod's ORIGINAL text. When the game runs in another language and already injected a translation
+                        // into this field (the mod's own, or a translation mod's), the original is recovered from what the game remembers; a
+                        // translation is never translated again into a third language.
+                        Func<string> english = () =>
+                        {
+                            string og = ReplacedEnglish(d.GetType(), d.defName, f.Name);
+                            if (og != null) return og;
+                            return covers != null && GameIsTarget ? null : pre != null ? cur.Substring(5) : cur;
+                        };
                         harvestingGenerated = d.generated;
                         try { Decide(ms, covers, english, d.GetType().Name + ":" + d.defName + "." + f.Name, b); }
                         finally { harvestingGenerated = false; }
@@ -427,6 +442,44 @@ namespace AutoTranslate
                 catch (Exception e) { ms.Fail("harvest", "def " + d.GetType().Name + ":" + d.defName, e); if (!ms.Active) return; }
             }
             AtLog.Debug("harvest-defs", "mod " + ms.Id + ": scanned " + defs + " defs");
+        }
+
+        static string makePrefix;
+        static bool makePrefixTried;
+
+        /// <summary>The game's words in front of the item in a "Make X" recipe, in the game's language ("Fazer "); null when unknown or when it is English.</summary>
+        static string MakePrefix()
+        {
+            if (!makePrefixTried)
+            {
+                makePrefixTried = true;
+                try
+                {
+                    string s = "RecipeMake".Translate("\u0001").ToString();
+                    int i = s == null ? -1 : s.IndexOf('\u0001');
+                    makePrefix = i > 0 && s != "Make \u0001" ? s.Substring(0, i) : null;
+                }
+                catch (Exception e) { AtLog.Warn("harvest-defs", "could not read the game's 'RecipeMake' text (recipes keep their label)", e); makePrefix = null; }
+            }
+            return makePrefix;
+        }
+
+        /// <summary>The game builds "Make_&lt;item&gt;" recipes from each craftable item's label before we translate it; rebuild the label and the
+        /// job text from the translated item label, with the game's own words around it.</summary>
+        static void RefreshMakeRecipe(Def d)
+        {
+            try
+            {
+                if (!GameIsTarget || !(d is ThingDef)) return;
+                string pre = MakePrefix();
+                RecipeDef r = pre == null ? null : DefDatabase<RecipeDef>.GetNamedSilentFail("Make_" + d.defName);
+                if (r == null || !r.generated || r.label == null || !r.label.StartsWith(pre, StringComparison.Ordinal)) return;
+                r.label = "RecipeMake".Translate(d.label).ToString();
+                string job = "RecipeMakeJobString".Translate(d.label).ToString();
+                if (!string.IsNullOrEmpty(job)) r.jobString = job;
+                ResetDefCaches(r);
+            }
+            catch (Exception e) { AtLog.Warn("apply", "could not rebuild the 'Make' recipe of " + d.defName, e); }
         }
 
         static void ResetDefCaches(Def d)

@@ -78,6 +78,23 @@ def pair_dir(src, tgt):
     return models_dir() / f"{src}_{tgt}"
 
 
+def find_model_files(root):
+    """(model.bin, tokenizer for the source side, tokenizer for the target side) inside an unpacked Argos model; a missing one is None.
+    Most packages carry one sentencepiece.model for both sides; some carry source.spm and target.spm instead."""
+    root = Path(root)
+    model_bin = next(root.rglob("model.bin"), None)
+    both = next(root.rglob("sentencepiece.model"), None)
+    enc = both or next(root.rglob("source.spm"), None) or next(root.rglob("*.spm"), None)
+    dec = both or next(root.rglob("target.spm"), None) or enc
+    return model_bin, enc, dec
+
+
+def listing(root, limit=14):
+    """Short text of what is inside a model folder, to put in an error message."""
+    names = sorted(str(p.relative_to(root)) for p in Path(root).rglob("*") if p.is_file())
+    return ", ".join(names[:limit]) + (f" (+{len(names) - limit} more)" if len(names) > limit else "") if names else "(empty)"
+
+
 def is_installed(src, tgt):
     return (pair_dir(src, tgt) / "ok").exists()
 

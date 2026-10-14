@@ -10,7 +10,7 @@ import urllib.request
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["RWTRANSLATE_HOME"] = tempfile.mkdtemp()
 
-from rwtranslate import languages, protect, server  # noqa: E402
+from rwtranslate import languages, models as models_mod, protect, server  # noqa: E402
 from rwtranslate.engine import split_sentences, set_engine  # noqa: E402
 
 DICT = {"The colonist": "O colono", " was hit by ": " foi atingido por ", "a raider": "um invasor",
@@ -385,3 +385,37 @@ class RepairSavedTranslations(unittest.TestCase):
         self.assertEqual((e["safe"], e["mine"], e["iron sword"]), ("cofre", "mina", "espada de ferro"))
         self.assertEqual((e["A safe place."], e["wood"]), ("Um lugar seguro.", "madeira"))
         self.assertEqual(bulk.repair_all("pt-BR"), 0)             # nothing left to fix
+
+
+class ModelFiles(unittest.TestCase):
+    def test_finds_the_usual_and_the_split_tokenizer_layouts(self):
+        import pathlib
+        d = pathlib.Path(tempfile.mkdtemp())
+        (d / "model").mkdir()
+        (d / "model" / "model.bin").write_text("x")
+        (d / "sentencepiece.model").write_text("x")
+        b, e, o = models_mod.find_model_files(d)
+        self.assertTrue(b.name == "model.bin" and e.name == o.name == "sentencepiece.model")
+        d2 = pathlib.Path(tempfile.mkdtemp())
+        (d2 / "model.bin").write_text("x")
+        (d2 / "source.spm").write_text("x")
+        (d2 / "target.spm").write_text("x")
+        b, e, o = models_mod.find_model_files(d2)
+        self.assertEqual((e.name, o.name), ("source.spm", "target.spm"))
+        d3 = pathlib.Path(tempfile.mkdtemp())
+        (d3 / "readme.txt").write_text("x")
+        self.assertEqual(models_mod.find_model_files(d3), (None, None, None))
+        self.assertIn("readme.txt", models_mod.listing(d3))
+
+    def test_a_folder_without_model_files_is_reported_and_removed(self):
+        from rwtranslate import engine
+        from rwtranslate.paths import models_dir
+        d = models_dir() / "en_zz"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "ok").write_text("1")
+        (d / "weird.bin").write_text("x")
+        engine._engines.pop(("en", "zz"), None)
+        with self.assertRaises(engine.EngineError) as cm:
+            engine._load("en", "zz")
+        msg = str(cm.exception)
+        self.assertTrue("ctranslate2" in msg or ("model files not found" in msg and "weird.bin" in msg), msg)

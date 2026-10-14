@@ -73,6 +73,7 @@ namespace Verse
             return l != null && l.keyedReplacements.TryGetValue(key, out r) ? r.value : null;
         }
         public static TaggedString Translate(this string key) { return Look(LanguageDatabase.activeLanguage, key) ?? Look(LanguageDatabase.defaultLanguage, key) ?? key; }
+        public static TaggedString Translate(this string key, string arg) { string t = Translate(key).ToString(); return t.Replace("{0}", arg); }
         public static bool CanTranslate(this string key) { return Look(LanguageDatabase.activeLanguage, key) != null || Look(LanguageDatabase.defaultLanguage, key) != null; }
     }
     public enum GameFont { Tiny, Small, Medium }
@@ -95,7 +96,7 @@ namespace Verse
     public abstract class Command { public string defaultLabel, defaultDesc; }
     public abstract class Designator : Command { }
     public class DesignationCategoryDef : Def { public List<Designator> designators = new List<Designator>(); public List<Designator> AllResolvedDesignators { get { return designators; } } }
-    public static class DefDatabase<T> where T : Def { public static List<T> list = new List<T>(); public static List<T> AllDefsListForReading { get { return list; } } }
+    public static class DefDatabase<T> where T : Def { public static List<T> list = new List<T>(); public static List<T> AllDefsListForReading { get { return list; } } public static T GetNamedSilentFail(string defName) { return list.Find(x => x.defName == defName); } }
     public class ModContentPack
     {
         public ModAssemblyHandler assemblies = new ModAssemblyHandler();
@@ -109,7 +110,7 @@ namespace Verse
     public static class LoadedModManager { public static List<ModContentPack> RunningModsListForReading; }
     public class Def { public bool generated; public string defName, label, description; string cachedLabelCap = "CACHED"; public string CapForTest { get { return cachedLabelCap; } } }
     public class ThingDef : Def { }
-    public class RecipeDef : Def { }
+    public class RecipeDef : Def { public string jobString; }
     public class LanguageInfo { public string friendlyNameEnglish, friendlyNameNative; }
     public class DefInjectionPackage
     {

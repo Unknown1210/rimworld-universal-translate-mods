@@ -66,7 +66,8 @@ def selectable_label_class():
     from tkinter import font as tkfont, ttk
 
     class SelectableLabel(tk.Text):
-        def __init__(self, parent, text="", anchor="center", justify="center", foreground="", font=None, wraplength=0, **_ignored):
+        def __init__(self, parent, text="", anchor="center", justify="center", foreground="", font=None, wraplength=0, autowidth=False,
+                     **_ignored):
             style = ttk.Style()
             bg = style.lookup("TFrame", "background") or parent.winfo_toplevel().cget("background")
             fg = foreground or style.lookup("TLabel", "foreground") or "black"
@@ -75,6 +76,7 @@ def selectable_label_class():
                              cursor="xterm", takefocus=0, background=bg, foreground=fg, font=f, insertwidth=0, exportselection=False,
                              selectbackground="#3d7be0", selectforeground="white", inactiveselectbackground="#a8c4f0")
             self._text, self._wrap, self._anchor, self._justify = "", wraplength, anchor, justify
+            self._autowidth, self._font = autowidth, f          # autowidth: a short caption that is as wide as its text (not stretched)
             self.bind("<Button-1>", lambda e: self.focus_set())
             self.bind("<Control-a>", self._select_all)
             self.bind("<Control-c>", self._copy)
@@ -96,6 +98,9 @@ def selectable_label_class():
             self.insert("1.0", self._text)
             self._tag()
             super().configure(state="disabled")
+            if self._autowidth:
+                zero = max(1, self._font.measure("0"))
+                super().configure(width=max(1, -(-self._font.measure(self._text) // zero) + 1))
             self._fit()
 
         def _fit(self):
@@ -245,10 +250,10 @@ class App:
         bar = ttk.Frame(outer)
         bar.grid(row=0, column=0, sticky="ew")
         bar.columnconfigure(0, weight=1)
-        self.lbl_ui = ttk.Label(bar)
+        self.lbl_ui = selectable_label_class()(bar, autowidth=True, anchor="w", justify="left")
         self.lbl_ui.grid(row=0, column=1, padx=(0, 6))
-        self.lbl_ui_note = ttk.Label(bar, foreground="#777777")
-        self.lbl_ui_note.grid(row=0, column=0, sticky="e", padx=(0, 10))
+        self.lbl_ui_note = selectable_label_class()(bar, foreground="#777777", anchor="e", justify="right")
+        self.lbl_ui_note.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         ui_values = sorted(UI_NAMES.values(), key=lambda n: n.lower())
         self.ui_box = ttk.Combobox(bar, width=fit_width(ui_values), state="readonly", values=ui_values)
         self.ui_box.set(UI_NAMES.get(i18n.normalize_choice(self.lang), self.lang))
@@ -323,7 +328,7 @@ class App:
         # target language: the single place to choose it; the game mod reads config.json
         row = ttk.Frame(content)
         row.grid(row=3, column=0, pady=(0, 2))
-        self.lbl_target = ttk.Label(row)
+        self.lbl_target = selectable_label_class()(row, autowidth=True, anchor="w", justify="left")
         self.lbl_target.grid(row=0, column=0, padx=(0, 6))
         self.lang_box = ttk.Combobox(row, width=30, state="readonly")
         self.lang_box.grid(row=0, column=1, padx=(0, 6))
@@ -408,7 +413,7 @@ class App:
         bar = ttk.Frame(lg)
         bar.grid(row=1, column=0, sticky="ew", pady=(0, 6))
         bar.columnconfigure(3, weight=1)
-        self.lbl_log_filter = ttk.Label(bar)
+        self.lbl_log_filter = selectable_label_class()(bar, autowidth=True, anchor="w", justify="left")
         self.lbl_log_filter.grid(row=0, column=0, padx=(0, 6))
         self.log_filter_box = ttk.Combobox(bar, state="readonly", width=24)
         self.log_filter_box.grid(row=0, column=1, padx=(0, 12))

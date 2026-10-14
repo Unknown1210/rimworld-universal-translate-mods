@@ -98,13 +98,12 @@ class CT2Engine:
             import sentencepiece
         except ImportError as e:  # pragma: no cover
             raise EngineError(f"missing dependency: {e}")
-        model_bin = next(model_root.rglob("model.bin"), None)
-        sp = next(model_root.rglob("sentencepiece.model"), None)
+        from . import models
+        model_bin, sp, sp_out = models.find_model_files(model_root)
         if model_bin is None or sp is None:
-            listing = sorted(str(p.relative_to(model_root)) for p in model_root.rglob("*"))[:60]
-            log.error("model files missing under %s (model.bin=%s sentencepiece.model=%s). Contents: %s",
-                      model_root, model_bin, sp, listing)
-            raise EngineError(f"model files not found under {model_root} (see helper.log)")
+            what = models.listing(model_root)
+            log.error("model files missing under %s (model.bin=%s tokenizer=%s). Contents: %s", model_root, model_bin, sp, what)
+            raise EngineError(f"model files not found in {Path(model_root).name} (the folder has: {what})")
         import time
         t0 = time.perf_counter()
         self._lock = threading.Lock()
@@ -112,6 +111,7 @@ class CT2Engine:
             self._tr = ctranslate2.Translator(str(model_bin.parent), device="cpu",
                                               inter_threads=1, intra_threads=threads)
             self._sp = sentencepiece.SentencePieceProcessor(model_file=str(sp))
+            self._sp_out = self._sp if sp_out == sp else sentencepiece.SentencePieceProcessor(model_file=str(sp_out))
         except Exception as e:
             log.exception("failed to load model from %s", model_bin.parent)
             raise EngineError(f"failed to load model: {type(e).__name__}: {e}")
@@ -140,7 +140,7 @@ class CT2Engine:
         tokens = [self._sp.encode(s, out_type=str) for s in sentences]
         with self._lock:
             results = self._tr.translate_batch(tokens, beam_size=4, max_decoding_length=512)
-        return [detokenize(self._sp, r.hypotheses[0]) for r in results]
+        return [detokenize(self._sp_out, r.hypotheses[0]) for r in results]
 
 
 class PivotEngine:
@@ -161,7 +161,15 @@ _engines_lock = threading.Lock()
 def _load(src, tgt):
     key = (src, tgt)
     if key not in _engines:
-        _engines[key] = CT2Engine(models_dir() / f"{src}_{tgt}", family=languages.family(tgt))
+        folder = models_dir() / f"{src}_{tgt}"
+        try:
+            _engines[key] = CT2Engine(folder, family=languages.family(tgt))
+        except EngineError as e:
+            if "model files not found" in str(e):
+                import shutil
+                shutil.rmtree(folder, ignore_errors=True)       # a broken install is removed: the next try downloads the model again
+                log.warning("removed the incomplete model folder %s", folder)
+            raise
     return _engines[key]
 
 

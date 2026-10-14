@@ -12,6 +12,7 @@ namespace AutoTranslate
         public ModContentPack Provider;
         public string Value;
         public string File;
+        public bool FilePlaceholder;      // the whole file is an untranslated copy: its texts together read as another language than the target
     }
 
     /// <summary>
@@ -25,6 +26,8 @@ namespace AutoTranslate
         public readonly Dictionary<string, List<Cover>> Defs = new Dictionary<string, List<Cover>>();
         public readonly Dictionary<string, List<Cover>> Keyed = new Dictionary<string, List<Cover>>();
         public int Files, Entries, BadFiles;
+        string targetCode;
+        List<Cover> fileCovers;           // the covers of the file being read
         public readonly List<string[]> BadFileList = new List<string[]>();   // {path, provider packageId, error}
 
         public static IEnumerable<string> ModFolders(ModContentPack mod)
@@ -44,7 +47,7 @@ namespace AutoTranslate
 
         public static CoverageIndex Build(string target, IList<ModContentPack> mods, ICollection<string> fieldWhitelist)
         {
-            var idx = new CoverageIndex();
+            var idx = new CoverageIndex { targetCode = target };
             foreach (ModContentPack mod in mods)
             {
                 ModContentPack m = mod;
@@ -88,6 +91,7 @@ namespace AutoTranslate
                 }
                 var settings = new XmlReaderSettings { DtdProcessing = DtdProcessing.Prohibit, IgnoreComments = true, XmlResolver = null };
                 Files++;
+                fileCovers = new List<Cover>();
                 using (var r = XmlReader.Create(file, settings))
                 {
                     r.MoveToContent();
@@ -114,9 +118,11 @@ namespace AutoTranslate
                         else Add(Keyed, name, provider, value, file);
                     }
                 }
+                JudgeFile();
             }
             catch (Exception e)
             {
+                fileCovers = null;
                 BadFiles++;
                 BadFileList.Add(new[] { file, provider.PackageIdPlayerFacing, e.GetType().Name + ": " + e.Message });
                 AtLog.Warn("coverage", "cannot read translation file (ignored): " + file + " from mod " + provider.PackageIdPlayerFacing, e);
@@ -127,8 +133,39 @@ namespace AutoTranslate
         {
             List<Cover> l;
             if (!map.TryGetValue(key, out l)) map[key] = l = new List<Cover>(1);
-            l.Add(new Cover { Provider = provider, Value = value, File = file });
+            var c = new Cover { Provider = provider, Value = value, File = file };
+            l.Add(c);
+            if (fileCovers != null) fileCovers.Add(c);
             Entries++;
+        }
+
+        /// <summary>A "translation" file the author never translated (the game's tool copies the English text into it): short labels cannot
+        /// be judged one by one ("MF Bed"), but the whole file read as one text is plainly English. All its entries then count as placeholders.</summary>
+        void JudgeFile()
+        {
+            var covers = fileCovers;
+            fileCovers = null;
+            if (covers == null || covers.Count < 2 || targetCode == null) return;
+            var texts = new List<string>();
+            int chars = 0, foreign = 0, scripted = 0;
+            foreach (Cover c in covers)
+            {
+                string v = TranslationCache.Norm(c.Value);
+                texts.Add(v);
+                chars += v.Length;
+                string sl = LangDetect.ScriptLang(v);
+                if (sl != null) { scripted++; if (!LangMap.Same(sl, targetCode)) foreign++; }
+            }
+            bool untranslated;
+            if (scripted * 2 > covers.Count) untranslated = foreign * 2 > scripted;
+            else
+            {
+                if (chars < 60) return;
+                bool conf; string det;
+                string lat = LangDetect.LatinLang(texts, out conf, out det);
+                untranslated = conf && !LangMap.Same(lat, targetCode);
+            }
+            if (untranslated) foreach (Cover c in covers) c.FilePlaceholder = true;
         }
 
         /// <summary>Covers of a def field, trying the def class and its base classes (and the legacy plural folder name).</summary>

@@ -4,6 +4,16 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.013 - 2026-10-14
+- Corrigido: as receitas das bancadas ("Fazer repair kit", "Fazer throwing dagger Belt") ficavam com o nome do item em inglês, porque o jogo monta a receita antes da tradução. Agora, ao traduzir o nome do item, o mod refaz o nome e o texto de trabalho da receita ("Fazer X", "Fazendo X.") com as palavras do próprio jogo.
+- Corrigido: receitas em inglês criadas por outros mods ("Make medicine x5", "Make any stone blocks x3") são traduzidas e ficam com o "Fazer" do jogo na frente.
+- Corrigido: arquivos de "tradução" que são cópia do inglês (por exemplo, da mobília da Misstall, com nomes como "MF Large Generator") agora são avaliados como um todo: se o conjunto dos textos é claramente inglês, todas as entradas, inclusive os nomes curtos, contam como cópia do original e são traduzidas.
+- Corrigido: nunca traduzir uma tradução. Se o jogo roda em outro idioma e já aplicou a tradução de um mod, o mod recupera o inglês original guardado pelo jogo e traduz a partir dele para o idioma escolhido.
+- Corrigido: ao baixar um modelo de idioma que vem com outro formato de arquivos (por exemplo, source.spm e target.spm), o programa agora o aceita; uma pasta de modelo incompleta é apagada para ser baixada de novo, e a mensagem de erro lista o que há na pasta.
+- Alterado: os textos "Idioma da janela", "Idioma de destino", o filtro do Log e o aviso do topo da janela do executável podem ser selecionados e copiados.
+- Alterado: a descrição do mod no jogo ficou bem mais curta, em inglês e depois em português, com o aviso de que o Harmony e o programa tradutor são obrigatórios e os links da oficina do Harmony e do GitHub.
+- Adicionado: testes novos para as receitas "Fazer X", para arquivos de tradução que são cópia, para a regra de nunca traduzir uma tradução e para os formatos de pasta dos modelos.
+
 ## v0.012 - 2026-10-14
 - Adicionado: botões no topo dos dois READMEs (idioma Português / English, Harmony na Steam e Argos Translate no GitHub).
 - Adicionado: botão "Página no GitHub" na aba Início do executável.
