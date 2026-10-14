@@ -10,12 +10,12 @@
 
 <div align="justify">
 
-**Versão atual: 0.019** · [Baixar na aba Releases](../../releases/latest)
+**Versão atual: 0.020** · [Baixar na aba Releases](../../releases/latest)
 
 Traduz **automaticamente** os outros mods do seu jogo para o seu idioma, **sem precisar de um mod de tradução para cada mod**.
 A tradução é feita **no seu computador e de graça**. Depois de baixar uma vez o modelo do seu idioma, **não precisa de internet**. Cada tradução fica salva, então ela só é feita uma vez.
 
-> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.019). Veja "Estado atual" abaixo.
+> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.020). Veja "Estado atual" abaixo.
 
 <h2 align="left">Compatibilidade</h2>
 
@@ -118,11 +118,13 @@ Com o **modo desenvolvedor** do RimWorld ligado, o próprio jogo marca os textos
 
 - **Nada é enviado pela internet.** A única coisa baixada é o modelo de tradução, uma vez (e as atualizações, se você clicar).<br><sub>────────────</sub>
 - **De onde vem o modelo:** do projeto aberto [**Argos Translate**](https://github.com/argosopentech/argos-translate). A lista de modelos fica no GitHub dele e os arquivos são baixados de `argos-net.com`. É um download anônimo: **sem conta, sem login, sem chave e sem assinatura de nenhum serviço** (o programa não usa nenhuma IA online; quem traduz é o modelo, rodando no seu computador). Limite honesto: a lista do Argos não traz uma impressão digital (hash) dos modelos, então eles não são conferidos depois de baixados, só protegidos pela conexão segura (https).<br><sub>────────────</sub>
-- Tudo fica em `%LOCALAPPDATA%\RimWorldAutoTranslate`: modelos, traduções salvas (`cache`), suas correções (`overrides`) e logs (`logs`).
+- Tudo fica em `%LOCALAPPDATA%\RimWorldAutoTranslate`: modelos, traduções salvas (`cache`), suas correções (`overrides`) e logs (`logs`).<br><sub>────────────</sub>
+- **Licença:** o código é livre, sob a [licença MIT](LICENSE): você pode usar, copiar, modificar e redistribuir, inclusive em outros projetos, mantendo o aviso de direitos autorais; o programa é fornecido "como está", sem garantia. **Se você usar ou adaptar este código (inclusive em complementos), cite o autor, peraquetocosta, e o link deste repositório.**<br><sub>────────────</sub>
+- **Créditos e licenças de terceiros** (Harmony, CTranslate2, SentencePiece, Argos Translate e outros): veja [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 <h2 align="left">Estado atual (transparência)</h2>
 
-Esta é uma **versão inicial** (versão atual 0.019), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. **A tradução automática não é 100% perfeita**, mas é bem melhor do que jogar com um mod que não está no seu idioma. **Se você encontrar qualquer erro, por favor reporte** (veja "Deu problema ou conflito com um mod?" abaixo): isso ajuda a melhorar o projeto para todo mundo.
+Esta é uma **versão inicial** (versão atual 0.020), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. **A tradução automática não é 100% perfeita**, mas é bem melhor do que jogar com um mod que não está no seu idioma. **Se você encontrar qualquer erro, por favor reporte** (veja "Deu problema ou conflito com um mod?" abaixo): isso ajuda a melhorar o projeto para todo mundo.
 
 <h2 align="left">Deu problema ou conflito com um mod?</h2>
 

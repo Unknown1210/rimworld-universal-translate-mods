@@ -4,6 +4,10 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.020 - 2026-10-14
+- Adicionado: licença MIT do código (arquivo LICENSE), com o pedido de que quem usar ou adaptar o código (inclusive em complementos) cite o autor e o link do repositório; a licença é citada nos dois READMEs e na descrição do mod.
+- Adicionado: THIRD_PARTY_NOTICES.md com os créditos e as licenças de terceiros usados (Harmony, CTranslate2, SentencePiece, NumPy, PyYAML, Python, PyInstaller e o Argos Translate, cujos modelos não fazem parte do projeto); ele é citado nos dois READMEs e na descrição do mod.
+
 ## v0.019 - 2026-10-14
 - Adicionado: imagem de capa do mod dentro do pacote (About/Preview.png), que o RimWorld mostra na tela de Mods e usa como capa ao publicar na Oficina da Steam; a conferência do pacote passou a exigir esse arquivo.
 - Alterado: na aba Início do executável, o botão "Abrir pasta de logs" foi trocado por "Abrir pasta de dados" (a pasta principal do mod em %LOCALAPPDATA%) e "Abrir pasta do mod" (onde o mod está instalado, achado em RimWorld\Mods, na Oficina da Steam, nas pastas adicionadas ou na pasta lembrada pelo programa; se não achar, avisa onde procurou).

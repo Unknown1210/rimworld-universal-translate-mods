@@ -28,6 +28,10 @@ All the details (how it works, Windows warning, privacy, tips): https://github.c
 
 Settings: Options > Mods > Auto Translate. Found a problem? Report it on GitHub.
 
+License: MIT (free to use, copy, modify and share, keeping the copyright notice). If you use or adapt the code, please credit peraquetocosta and link to the GitHub project.
+
+Credits and third-party licenses (Harmony, CTranslate2, SentencePiece, Argos Translate...): https://github.com/Unknown1210/rimworld-universal-translate-mods/blob/main/THIRD_PARTY_NOTICES.md
+
 ----------------------------------------
 
 EM DESENVOLVIMENTO
@@ -49,6 +53,10 @@ Depois: abra o programa, escolha o seu idioma, deixe-o aberto enquanto joga (só
 Todos os detalhes (como funciona, aviso do Windows, privacidade, dicas): https://github.com/Unknown1210/rimworld-universal-translate-mods
 
 Opções: Opções > Mods > Auto Translate. Achou um problema? Avise no GitHub.
+
+Licença: MIT (livre para usar, copiar, modificar e compartilhar, mantendo o aviso de direitos autorais). Se usar ou adaptar o código, cite peraquetocosta e o link do projeto no GitHub.
+
+Créditos e licenças de terceiros (Harmony, CTranslate2, SentencePiece, Argos Translate...): https://github.com/Unknown1210/rimworld-universal-translate-mods/blob/main/THIRD_PARTY_NOTICES.md
   </description>
   <modDependencies>
     <li>
