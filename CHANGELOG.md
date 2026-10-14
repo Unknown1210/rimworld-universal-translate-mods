@@ -4,6 +4,9 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.015 - 2026-10-14
+- Alterado: capa do mod para a Steam: título "Auto Translate Mods", autor "peraquetocosta", requisitos (Harmony, Auto Translate Mods e Helper .exe) e a mensagem "Baixe no GitHub" centralizada no quadro do programa.
+
 ## v0.014 - 2026-10-14
 - Adicionado: capa do mod para a Steam (pasta assets): imagem de 1920x1080, versão pequena de 640x360 e o arquivo cover.html para editar o texto e as cores.
 
