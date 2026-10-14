@@ -4,6 +4,16 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.012 - 2026-10-14
+- Adicionado: botões no topo dos dois READMEs (idioma Português / English, Harmony na Steam e Argos Translate no GitHub).
+- Adicionado: botão "Página no GitHub" na aba Início do executável.
+- Adicionado: os textos da janela do executável podem ser selecionados e copiados (mouse, Ctrl+C, Ctrl+A e botão direito); nas tabelas, Ctrl+C copia as linhas selecionadas. Serve para colar um texto em um tradutor e conferir.
+- Alterado: a janela do executável se adapta ao idioma: as caixas de seleção, os botões e os cabeçalhos das colunas crescem com o texto e a janela se alarga sozinha, para nada ficar cortado.
+- Alterado: a caixa de idioma da janela mostra só o nome nativo de cada idioma; as linhas "Em execução..." e "Modelos instalados..." saíram da aba Início; o aviso ao preparar um idioma ficou curto e mostra o motivo se falhar.
+- Corrigido: nomes curtos que o modelo devolvia sem traduzir ou traduzia errado. "mine" agora é "mina" (e não "meu."), e frases devolvidas iguais ao original (por exemplo, em Title Case ou nomes com possessivo) ganham uma segunda tentativa, em minúsculas e, nos nomes curtos, como "a ...".
+- Corrigido: traduções antigas já salvas ("Seguro." para "safe", "Meu." para "mine" e ponto final em nomes curtos) são consertadas sozinhas pelo executável ao abrir ou ao escolher o idioma, sem precisar excluir as traduções.
+- Alterado: os 30 idiomas do RimWorld foram conferidos na lista de modelos do Argos Translate (todos têm modelo); um teste garante isso. README em português e inglês com texto novo no estado atual, links do Harmony e do Argos Translate e sem os itens de atualização sem janela e de token do GitHub.
+
 ## v0.011 - 2026-10-14
 - Corrigido: nomes curtos como "safe" (cofre) saíam como "Seguro." na tradução. Agora o tradutor não coloca ponto final em nome curto que no original não tem, e um pequeno glossário traduz "safe" como "cofre" (e equivalentes nos outros idiomas). Traduções antigas já salvas só mudam depois de "Excluir traduções" e de traduzir de novo.
 - Corrigido: mods em modo "do próprio mod" ou "de outro mod de tradução" ficavam inteiros em inglês quando não havia essa tradução (ex.: Vanilla Furniture Expanded - Security). Agora esses modos são "preferir": o que o mod escolhido não traz é traduzido automaticamente.

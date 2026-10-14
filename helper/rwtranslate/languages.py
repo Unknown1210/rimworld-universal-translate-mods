@@ -32,6 +32,12 @@ GAME_LANGUAGES = {
 }
 
 
+# Argos models "English -> X" that exist (checked in the Argos index; the window languages and the target languages must all be here).
+ARGOS_FROM_ENGLISH = frozenset({"ar", "az", "bg", "bn", "ca", "cs", "da", "de", "el", "eo", "es", "et", "eu", "fa", "fi", "fr", "ga", "gl", "he",
+                                "hi", "hu", "id", "it", "ja", "ko", "ky", "lt", "lv", "ms", "nb", "nl", "pb", "pl", "pt", "ro", "ru", "sk", "sl",
+                                "sq", "sv", "sw", "th", "tl", "tr", "uk", "ur", "vi", "zh", "zt"})
+
+
 # Target languages with regional variants. RimWorld has two Portuguese languages (folders "Portuguese" = Portugal and
 # "PortugueseBrazilian" = Brazil) and Argos has a model for each: "pb" is Brazilian, "pt" is the general/European one.
 FAMILY = {"pb": "pt"}          # model/detector codes that belong to the same language as another code

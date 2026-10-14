@@ -287,6 +287,10 @@ class WindowLanguages(unittest.TestCase):
         for c in ("ar", "hi", "th", "he", "id", "fa"):                 # languages RimWorld does not offer
             self.assertNotIn(c, self.i18n.UI_LANGS)
 
+    def test_every_language_offered_has_a_model(self):
+        for c in self.i18n.UI_LANGS:
+            self.assertTrue(c == "en" or languages.model_code(c) in languages.ARGOS_FROM_ENGLISH, f"{c} has no English -> {c} model")
+
     def test_variants_share_texts_and_models(self):
         self.assertEqual(self.i18n.text_source("pt-PT"), "pt")
         self.assertEqual(self.i18n.text_source("pt-BR"), "pt")
@@ -327,3 +331,57 @@ class WindowLanguages(unittest.TestCase):
         self.uitext.translate_missing("fr")
         txt = self.i18n.tr("fr", "det_tab_translated", n=3)           # the marker is protected from the engine, so formatting works
         self.assertTrue(txt.endswith("3)"), txt)
+
+
+class UntouchedPhrases(unittest.TestCase):
+    """A model that hands a Title Case phrase or an odd possessive back unchanged gets a second try."""
+
+    def run_fake(self, table):
+        calls = []
+
+        def run(sents):
+            calls.append(list(sents))
+            return [table.get(s, s) for s in sents]
+        return run, calls
+
+    def test_title_case_sentence_is_retried_in_lower_case(self):
+        from rwtranslate.engine import retranslate_unchanged
+        src = ["Advanced In Situ Road Resources Gatherer.", "Uses local resources to build roads."]
+        outs = ["Advanced In Situ Road Resources Gatherer.", "Usa recursos locais para construir estradas."]
+        run, calls = self.run_fake({"advanced in situ road resources gatherer.": "coletor avançado de recursos de estrada in situ."})
+        fixed = retranslate_unchanged(src, outs, run, "pt")
+        self.assertEqual(fixed[0], "coletor avançado de recursos de estrada in situ.")
+        self.assertEqual(fixed[1], outs[1])                       # what was translated is never touched
+        self.assertEqual(calls, [["advanced in situ road resources gatherer."]])
+
+    def test_short_label_is_framed_with_the_and_the_article_removed(self):
+        from rwtranslate.engine import retranslate_unchanged
+        run, calls = self.run_fake({"the electric stonecutter's table": "A mesa elétrica do cortador de pedras"})
+        fixed = retranslate_unchanged(["Electric stonecutter's table"], ["Electric stonecutter's table"], run, "pt")
+        self.assertEqual(fixed, ["mesa elétrica do cortador de pedras"])
+
+    def test_answer_that_is_still_the_source_changes_nothing(self):
+        from rwtranslate.engine import retranslate_unchanged
+        run, _ = self.run_fake({})
+        self.assertEqual(retranslate_unchanged(["Wood Stove"], ["Wood Stove"], run, "pt"), ["Wood Stove"])
+        self.assertEqual(retranslate_unchanged(["HP"], ["HP"], run, "pt"), ["HP"])          # one word: left alone, no second try
+
+    def test_languages_without_article_table_skip_the_frame(self):
+        from rwtranslate.engine import retranslate_unchanged
+        run, calls = self.run_fake({})
+        retranslate_unchanged(["wooden table"], ["wooden table"], run, "ja")
+        self.assertEqual(calls, [["wooden table"]])               # only the lower-case retry
+
+
+class RepairSavedTranslations(unittest.TestCase):
+    def test_glossary_word_and_full_stop_are_fixed_in_a_saved_cache(self):
+        from rwtranslate import bulk
+        d = bulk.cache_path("pt-BR", "x.mod").parent
+        d.mkdir(parents=True, exist_ok=True)
+        bulk.write_cache("pt-BR", "x.mod", {"safe": "Seguro.", "mine": "Meu.", "iron sword": "espada de ferro.",
+                                            "A safe place.": "Um lugar seguro.", "wood": "madeira"})
+        self.assertEqual(bulk.repair_all("pt-BR"), 3)
+        e = bulk.read_cache("pt-BR", "x.mod")
+        self.assertEqual((e["safe"], e["mine"], e["iron sword"]), ("cofre", "mina", "espada de ferro"))
+        self.assertEqual((e["A safe place."], e["wood"]), ("Um lugar seguro.", "madeira"))
+        self.assertEqual(bulk.repair_all("pt-BR"), 0)             # nothing left to fix

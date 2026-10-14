@@ -194,11 +194,61 @@ class Window(unittest.TestCase):
         app = self.build(fake_fetcher(release_json("v0.0")))
         values = set(app.ui_box.cget("values"))
         self.assertEqual(len(values), 30)
-        self.assertIn("Deutsch - German", values)
-        self.assertIn("Português (Brasil) - Portuguese (Brazil)", values)
+        self.assertIn("Deutsch", values)
+        self.assertIn("Português (Brasil)", values)
         self.assertEqual(set(app.lang_codes.values()), set(i18n.SUPPORTED_TARGETS))     # the target list is the same 30
+        from rwtranslate import gui
+        self.assertGreaterEqual(int(str(app.ui_box.cget("width"))), max(len(v) for v in values))     # no name is cut off
+        self.assertGreater(gui.fit_width(["简体中文"]), gui.fit_width(["abcd"]) - 1)                     # wide letters count double
         app.set_lang("fr")                                      # not translated yet (no model in tests): English until it is ready
         self.assertEqual(str(app.btn_quit.cget("text")), "Quit")
+
+    def test_github_button_opens_the_repository(self):
+        from unittest import mock
+        from rwtranslate import gui
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        self.assertEqual(str(app.btn_github.cget("text")), "Página no GitHub")
+        with mock.patch.object(gui.webbrowser, "open") as op:
+            app.btn_github.invoke()
+        op.assert_called_once_with("https://github.com/Unknown1210/rimworld-universal-translate-mods")
+        app.set_lang("en")
+        self.assertEqual(str(app.btn_github.cget("text")), "GitHub page")
+
+    def test_texts_can_be_selected_and_copied(self):
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        pump(self.root, lambda: "já está" in app.update_msg.get())
+        lbl = app.update_msg.label
+        self.assertIn("já está", lbl.cget("text"))
+        self.root.update()
+        lbl._select_all()
+        lbl._copy()
+        self.assertIn("já está", self.root.clipboard_get())          # what the user pastes into a translator
+        lbl.tag_remove("sel", "1.0", "end")
+        lbl._copy()                                                   # nothing selected: the whole text
+        self.assertEqual(self.root.clipboard_get(), lbl.cget("text"))
+        # tables: Ctrl+C copies rows
+        app.log_tree.insert("", "end", values=("10:00", "Jogo", "olá"))
+        app.log_tree.selection_set(app.log_tree.get_children())
+        app.log_tree.copy_rows()                                       # what Ctrl+C on the table runs
+        self.assertIn("olá", self.root.clipboard_get())
+
+    def test_nothing_is_cut_off_in_a_longer_language(self):
+        from rwtranslate import gui, i18n
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        long_text = {k: v + " " + "extra" * 6 for k, v in i18n.TEXT["en"].items() if k in ("tab_home", "tab_bulk", "tab_log", "check_btn", "apply_btn", "logs_btn", "report_btn", "github_btn", "quit_btn", "col_mod", "col_source", "col_texts", "col_words", "col_state", "col_folder")}
+        i18n.TEXT["xx"] = {**i18n.TEXT["en"], **long_text}
+        try:
+            app.lang = "xx"
+            app.apply_language()
+            self.root.update()
+            self.assertGreaterEqual(self.root.winfo_width(), self.root.winfo_reqwidth())      # the window grew to fit
+            for b in (app.btn_check, app.btn_apply, app.btn_logs, app.btn_report, app.btn_github, app.btn_quit):
+                self.assertGreaterEqual(b.winfo_width(), b.winfo_reqwidth())
+            for c in app.tree["columns"]:
+                self.assertGreaterEqual(int(app.tree.column(c, "width")), len(app.tree.heading(c, "text")) * 4)
+            self.assertGreaterEqual(int(str(app.ui_box.cget("width"))), max(len(v) for v in app.ui_box.cget("values")))
+        finally:
+            del i18n.TEXT["xx"]
 
     def test_every_text_exists_in_both_languages(self):
         from rwtranslate import i18n

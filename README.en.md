@@ -1,15 +1,21 @@
 <h1 align="center">Universal Translate for RimWorld</h1>
 
-<p align="center"><a href="README.md">🇧🇷 Português</a> · <b>🇺🇸 English</b></p>
+<p align="center">
+<a href="README.md"><img src="https://img.shields.io/badge/LANGUAGE-PORTUGU%C3%8AS-555555?style=for-the-badge" alt="Português"></a>
+<a href="README.en.md"><img src="https://img.shields.io/badge/LANGUAGE-ENGLISH-2ea44f?style=for-the-badge" alt="English"></a>
+<br>
+<a href="https://steamcommunity.com/workshop/filedetails/?id=2009463077"><img src="https://img.shields.io/badge/REQUIRES-HARMONY-1b2838?style=for-the-badge&logo=steam&logoColor=white" alt="Harmony (Steam Workshop)"></a>
+<a href="https://github.com/argosopentech/argos-translate"><img src="https://img.shields.io/badge/TRANSLATION_ENGINE-ARGOS_TRANSLATE-0366d6?style=for-the-badge&logo=github&logoColor=white" alt="Argos Translate (GitHub)"></a>
+</p>
 
 <div align="justify">
 
-**Current version: 0.011** · [Download from the Releases tab](../../releases/latest)
+**Current version: 0.012** · [Download from the Releases tab](../../releases/latest)
 
 Translates the other mods in your game into your language **automatically**, **without needing a translation mod for each mod**.
 The translation runs **on your computer, offline and for free**. Every translation is saved, so it is only done once.
 
-> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.011). See "Current status" below.
+> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.012). See "Current status" below.
 
 <h2 align="left">Compatibility</h2>
 
@@ -17,7 +23,7 @@ The translation runs **on your computer, offline and for free**. Every translati
 <tr><td width="22%"><b>Game</b></td><td align="justify">RimWorld <b>1.6</b></td></tr>
 <tr><td width="22%"><b>System</b></td><td align="justify"><b>Windows</b> 10/11</td></tr>
 <tr><td width="22%"><b>Original language of the mods</b></td><td align="justify"><b>Any</b>: the mod detects it by itself (English, Chinese, Russian, Portuguese, ...)</td></tr>
-<tr><td width="22%"><b>Target language</b></td><td align="justify"><b>Only the 30 languages RimWorld itself offers</b>: Catalan, Chinese (Simplified), Chinese (Traditional), Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Japanese, Korean, Korean (Fast Channel), Norwegian (Bokmål), Polish, Portuguese (Brazil), Portuguese (Portugal), Romanian, Russian, Slovak, Spanish (Castilian), Spanish (Latin America), Swedish, Turkish, Ukrainian and Vietnamese. Any other language is not offered. Each one has its own translation model (the Spanish and Korean variants share one model), downloaded on demand.</td></tr>
+<tr><td width="22%"><b>Target language</b></td><td align="justify"><b>Only the 30 languages RimWorld itself offers</b>: Catalan, Chinese (Simplified), Chinese (Traditional), Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Japanese, Korean, Korean (Fast Channel), Norwegian (Bokmål), Polish, Portuguese (Brazil), Portuguese (Portugal), Romanian, Russian, Slovak, Spanish (Castilian), Spanish (Latin America), Swedish, Turkish, Ukrainian and Vietnamese. Any other language is not offered. Each one has its own translation model, checked against the Argos Translate model list (the Spanish and Korean variants share one model), downloaded on demand.</td></tr>
 </table>
 
 
@@ -116,7 +122,7 @@ With RimWorld's **developer mode** on, the game itself marks the texts that have
 
 <h2 align="left">Current status (transparency)</h2>
 
-This is an **early version** (current version 0.011), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
+This is an **early version** (current version 0.012), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
 
 <h2 align="left">Problem or conflict with a mod?</h2>
 

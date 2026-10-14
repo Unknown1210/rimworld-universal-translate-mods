@@ -3,7 +3,7 @@ import re
 import threading
 from pathlib import Path
 
-from . import logsetup
+from . import languages, logsetup
 from .paths import models_dir
 
 log = logsetup.get("engine")
@@ -14,6 +14,48 @@ _SENT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
 def split_sentences(text):
     parts = [p for p in _SENT_RE.split(text.strip()) if p]
     return parts or [text]
+
+
+_WORD_RE = re.compile(r"[^\W\d_]+")
+# Leading articles the model may add when a label is translated inside "the ..." (target language family -> pattern)
+_ARTICLES = {
+    "pt": r"(?:o|a|os|as|um|uma)", "es": r"(?:el|la|los|las|un|una)", "ca": r"(?:el|la|els|les|un|una|l')",
+    "fr": r"(?:le|la|les|un|une|l')", "it": r"(?:il|lo|la|i|gli|le|un|uno|una|l')", "de": r"(?:der|die|das|ein|eine)",
+    "nl": r"(?:de|het|een)",
+}
+
+
+def _norm_text(t):
+    return " ".join(t.lower().split())
+
+
+def retranslate_unchanged(sentences, outputs, run, family=None):
+    """The model sometimes hands a phrase back untouched ("Advanced In Situ Road Resources Gatherer.", "Electric stonecutter's
+    table"): Title Case or an unusual possessive makes it treat the phrase as a name. Those get a second try, in lower case and,
+    for short labels, framed as "the ..." (the article is removed from the answer again). `run` translates a list of sentences.
+    Only an answer that really differs from the source replaces the first one. Returns the new outputs."""
+    outputs = list(outputs)
+
+    def stuck():
+        return [i for i, (s, o) in enumerate(zip(sentences, outputs)) if _norm_text(s) == _norm_text(o) and len(_WORD_RE.findall(s)) >= 2]
+    idx = stuck()
+    if idx:
+        tries = run([sentences[i].lower() for i in idx])
+        for i, t in zip(idx, tries):
+            low = sentences[i].lower()
+            if _norm_text(t) != _norm_text(low) and t.strip():
+                outputs[i] = t
+        idx = stuck()
+    art = _ARTICLES.get(family or "")
+    if idx and art:
+        short = [i for i in idx if len(_WORD_RE.findall(sentences[i])) <= 6 and not re.search(r"[.!?:;]$", sentences[i].strip())]
+        if short:
+            tries = run(["the " + sentences[i].lower() for i in short])
+            for i, t in zip(short, tries):
+                t2 = re.sub(r"^" + art + r"\s+", "", t.strip(), flags=re.I) if t else t
+                if t2 and not re.match(r"the\b", t2, re.I) and _norm_text(t2) != _norm_text(sentences[i]):      # "the ..." back = not translated
+                    outputs[i] = t2
+    return outputs
 
 
 class EngineError(Exception):
@@ -49,7 +91,8 @@ class EchoEngine:
 class CT2Engine:
     name = "ctranslate2"
 
-    def __init__(self, model_root: Path, threads: int = 0):
+    def __init__(self, model_root: Path, threads: int = 0, family=None):
+        self.family = family            # target language family (articles to strip when a label is retried), None = unknown
         try:
             import ctranslate2
             import sentencepiece
@@ -82,17 +125,22 @@ class CT2Engine:
                 flat.append(s)
                 owner.append(i)
         try:
-            tokens = [self._sp.encode(s, out_type=str) for s in flat]
-            with self._lock:
-                results = self._tr.translate_batch(tokens, beam_size=4, max_decoding_length=512)
+            outs = self._run(flat)
+            outs = retranslate_unchanged(flat, outs, self._run, self.family)
         except Exception:
             log.error("translate_batch failed: %d texts, %d sentences, longest=%d chars, first=%r",
                       len(texts), len(flat), max((len(s) for s in flat), default=0), flat[:1])
             raise
         out = [[] for _ in texts]
-        for i, r in zip(owner, results):
-            out[i].append(detokenize(self._sp, r.hypotheses[0]))
+        for i, o in zip(owner, outs):
+            out[i].append(o)
         return [" ".join(p) for p in out]
+
+    def _run(self, sentences):
+        tokens = [self._sp.encode(s, out_type=str) for s in sentences]
+        with self._lock:
+            results = self._tr.translate_batch(tokens, beam_size=4, max_decoding_length=512)
+        return [detokenize(self._sp, r.hypotheses[0]) for r in results]
 
 
 class PivotEngine:
@@ -113,7 +161,7 @@ _engines_lock = threading.Lock()
 def _load(src, tgt):
     key = (src, tgt)
     if key not in _engines:
-        _engines[key] = CT2Engine(models_dir() / f"{src}_{tgt}")
+        _engines[key] = CT2Engine(models_dir() / f"{src}_{tgt}", family=languages.family(tgt))
     return _engines[key]
 
 

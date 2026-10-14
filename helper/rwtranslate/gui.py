@@ -18,16 +18,25 @@ from . import __version__, activity, bulk, config, diagnostics, i18n, languages,
 from .paths import logs_dir
 
 log = logsetup.get("gui")
+REPO_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods"
 ISSUES_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods/issues/new?labels=bug"
 def ui_name(code):
-    """Window language as the picker shows it: its own name first, the English name after it ("Deutsch - German")."""
+    """Window language as the picker shows it: its own name only ("Deutsch"), short enough never to be cut off."""
     n = i18n.NAMES.get(code)
-    if not n:
-        return code
-    return n[2] if n[2] == n[0] else f"{n[2]} - {n[0]}"
+    return n[2] if n else code
 
 
 UI_NAMES = {c: ui_name(c) for c in i18n.UI_LANGS}
+
+
+def fit_width(values, minimum=12):
+    """Combobox width (in characters) that shows the longest value in full: Chinese, Japanese and Korean letters count double,
+    plus room for the arrow, so no name is ever cut off."""
+    import unicodedata
+    best = 0
+    for v in values:
+        best = max(best, sum(2 if unicodedata.east_asian_width(ch) in "WF" else 1 for ch in v))
+    return max(minimum, best + 3)
 SUPPORTED_TARGETS = i18n.SUPPORTED_TARGETS
 
 
@@ -41,6 +50,136 @@ def open_folder(path):
             subprocess.Popen(["xdg-open", str(path)])
     except Exception:
         log.exception("could not open folder %s", path)
+
+
+_SELECTABLE = None
+
+
+def selectable_label_class():
+    """A read-only text that looks like a Label but can be selected with the mouse and copied (Ctrl+C, or right-click -> Copy), so a
+    text of the window can be pasted into a translator. tkinter is imported here, not at module level, because the program falls
+    back to the console when no window can be opened."""
+    global _SELECTABLE
+    if _SELECTABLE is not None:
+        return _SELECTABLE
+    import tkinter as tk
+    from tkinter import font as tkfont, ttk
+
+    class SelectableLabel(tk.Text):
+        def __init__(self, parent, text="", anchor="center", justify="center", foreground="", font=None, wraplength=0, **_ignored):
+            style = ttk.Style()
+            bg = style.lookup("TFrame", "background") or parent.winfo_toplevel().cget("background")
+            fg = foreground or style.lookup("TLabel", "foreground") or "black"
+            f = font or tkfont.nametofont("TkDefaultFont")
+            super().__init__(parent, height=1, width=1, wrap="word", borderwidth=0, highlightthickness=0, padx=0, pady=0, relief="flat",
+                             cursor="xterm", takefocus=0, background=bg, foreground=fg, font=f, insertwidth=0, exportselection=False,
+                             selectbackground="#3d7be0", selectforeground="white", inactiveselectbackground="#a8c4f0")
+            self._text, self._wrap, self._anchor, self._justify = "", wraplength, anchor, justify
+            self.bind("<Button-1>", lambda e: self.focus_set())
+            self.bind("<Control-a>", self._select_all)
+            self.bind("<Control-c>", self._copy)
+            self.bind("<<Copy>>", self._copy)
+            self.bind("<Button-3>", self._menu)
+            self.bind("<Configure>", lambda e: self._fit())
+            self.bind("<Key>", lambda e: None if (e.state & 4 and e.keysym.lower() in ("c", "a")) else "break")
+            self._set(text)
+
+        def _tag(self):
+            j = "center" if self._justify == "center" else "right" if self._justify == "right" else "left"
+            self.tag_configure("t", justify=j)
+            self.tag_add("t", "1.0", "end")
+
+        def _set(self, text):
+            self._text = str(text)
+            super().configure(state="normal")
+            self.delete("1.0", "end")
+            self.insert("1.0", self._text)
+            self._tag()
+            super().configure(state="disabled")
+            self._fit()
+
+        def _fit(self):
+            try:
+                if self.winfo_width() < 20:
+                    return
+                self.update_idletasks()
+                n = self.count("1.0", "end-1c", "update", "displaylines")
+                n = ((n[0] if isinstance(n, tuple) else n) or 0) + 1          # count = display lines BETWEEN the two indexes: one less than the lines shown
+                if int(str(super().cget("height"))) != n:
+                    super().configure(height=n)
+            except Exception:  # noqa: BLE001
+                pass
+
+        def _select_all(self, _e=None):
+            self.tag_add("sel", "1.0", "end-1c")
+            return "break"
+
+        def _copy(self, _e=None):
+            try:
+                txt = self.get("sel.first", "sel.last")
+            except tk.TclError:
+                txt = self._text
+            self.clipboard_clear()
+            self.clipboard_append(txt)
+            return "break"
+
+        def _menu(self, e):
+            m = tk.Menu(self, tearoff=0)
+            m.add_command(label=i18n.tr(i18n.current(), "copy_text"), command=self._copy)
+            m.add_command(label=i18n.tr(i18n.current(), "select_all"), command=self._select_all)
+            m.tk_popup(e.x_root, e.y_root)
+
+        def configure(self, cnf=None, **kw):
+            if cnf:
+                kw.update(cnf)
+            if "text" in kw:
+                self._set(kw.pop("text"))
+            if "wraplength" in kw:
+                self._wrap = kw.pop("wraplength")
+            for k in ("anchor", "justify"):
+                if k in kw:
+                    setattr(self, "_" + k, kw.pop(k))
+                    self._tag()
+            if "foreground" in kw:
+                super().configure(foreground=kw.pop("foreground") or ttk.Style().lookup("TLabel", "foreground") or "black")
+            kw.pop("padding", None)
+            if kw:
+                super().configure(**kw)
+            return None
+        config = configure
+
+        def cget(self, key):
+            if key == "text":
+                return self._text
+            if key == "wraplength":
+                return self._wrap
+            return super().cget(key)
+
+    _SELECTABLE = SelectableLabel
+    return _SELECTABLE
+
+
+def fit_columns(tree):
+    """No column heading is ever cut off, whatever the window language: each column is at least as wide as its heading."""
+    from tkinter import font as tkfont
+    f = tkfont.nametofont("TkHeadingFont") if "TkHeadingFont" in tkfont.names() else tkfont.nametofont("TkDefaultFont")
+    for c in tree["columns"]:
+        need = f.measure(str(tree.heading(c, "text"))) + 26
+        cur = int(tree.column(c, "width"))
+        tree.column(c, minwidth=max(need, int(tree.column(c, "minwidth"))), width=max(cur, need))
+
+
+def enable_copy(tree):
+    """Ctrl+C on a table copies the selected rows (cells separated by tabs); with nothing selected, all rows."""
+    def copy(_e=None):
+        rows = tree.selection() or tree.get_children()
+        text = "\n".join("\t".join(str(v) for v in tree.item(r, "values")) for r in rows)
+        tree.clipboard_clear()
+        tree.clipboard_append(text)
+        return "break"
+    tree.bind("<Control-c>", copy)
+    tree.bind("<Control-C>", copy)
+    tree.copy_rows = copy
 
 
 class Field:
@@ -83,6 +222,7 @@ class App:
         self.mod_dirs_override = mod_dirs                  # tests; None = detect Steam folders
         self.restart_fn = restart or self._restart
         self.lang = lang or i18n.current()
+        self.repaired = set()
         self.ui_job = None                                 # language whose window texts are being prepared (translated) in the background
         self.q = queue.Queue()
         self.latest = None
@@ -110,8 +250,8 @@ class App:
         self.lbl_ui_note = ttk.Label(bar, foreground="#777777")
         self.lbl_ui_note.grid(row=0, column=0, sticky="e", padx=(0, 10))
         ui_values = sorted(UI_NAMES.values(), key=lambda n: n.lower())
-        self.ui_box = ttk.Combobox(bar, width=28, state="readonly", values=ui_values)
-        self.ui_box.set(UI_NAMES.get(self.lang, self.lang))
+        self.ui_box = ttk.Combobox(bar, width=fit_width(ui_values), state="readonly", values=ui_values)
+        self.ui_box.set(UI_NAMES.get(i18n.normalize_choice(self.lang), self.lang))
         self.ui_box.grid(row=0, column=2)
         self.ui_box.bind("<<ComboboxSelected>>", self.on_ui_lang)
 
@@ -142,13 +282,13 @@ class App:
 
     # ------------------------------------------------------------------ construction
     def field(self, parent, row, pady=(0, 2), color=None, sticky="ew"):
-        lbl = self.ttk.Label(parent, anchor="center", justify="center", foreground=color or "")
+        lbl = selectable_label_class()(parent, anchor="center", justify="center", foreground=color or "")
         lbl.grid(row=row, column=0, sticky=sticky, pady=pady)
         f = Field(lbl, self)
         self.fields.append(f)
         return f
 
-    def stretch(self, frame, buttons, uniform=True):
+    def stretch(self, frame, buttons, uniform=False):
         """Buttons side by side filling the row. uniform=False: each one is at least as wide as its text (no cut-off labels)
         and the spare room is shared equally."""
         for i, b in enumerate(buttons):
@@ -170,23 +310,22 @@ class App:
         keep_box = ttk.Frame(content)
         keep_box.grid(row=0, column=0, sticky="ew", pady=(0, 6))
         keep_box.columnconfigure(0, weight=1)
-        self.lbl_keep = ttk.Label(keep_box, font=("TkDefaultFont", 11, "bold"), anchor="center", justify="center")
+        self.lbl_keep = selectable_label_class()(keep_box, font=("TkDefaultFont", 11, "bold"), anchor="center", justify="center")
         self.lbl_keep.grid(row=0, column=0, sticky="ew")
-        self.lbl_keep2 = ttk.Label(keep_box, foreground="#555555", anchor="center", justify="center")      # when it can be closed
+        self.lbl_keep2 = selectable_label_class()(keep_box, foreground="#555555", anchor="center", justify="center")      # when it can be closed
         self.lbl_keep2.grid(row=1, column=0, sticky="ew", pady=(2, 0))
-        self.lbl_keep3 = ttk.Label(keep_box, foreground="#8a5a00", anchor="center", justify="center")      # texts only the running game can ask for
+        self.lbl_keep3 = selectable_label_class()(keep_box, foreground="#8a5a00", anchor="center", justify="center")      # texts only the running game can ask for
         self.lbl_keep3.grid(row=2, column=0, sticky="ew", pady=(4, 0))
-        self.lbl_keep4 = ttk.Label(keep_box, foreground="#555555", anchor="center", justify="center")      # restart if the game does not show new translations
+        self.lbl_keep4 = selectable_label_class()(keep_box, foreground="#555555", anchor="center", justify="center")      # restart if the game does not show new translations
         self.lbl_keep4.grid(row=3, column=0, sticky="ew", pady=(4, 0))
-        self.status = self.field(content, 1)
-        self.status2 = self.field(content, 2, pady=(0, 8))
+        ttk.Frame(content, height=6).grid(row=2, column=0)
 
         # target language: the single place to choose it; the game mod reads config.json
         row = ttk.Frame(content)
         row.grid(row=3, column=0, pady=(0, 2))
         self.lbl_target = ttk.Label(row)
         self.lbl_target.grid(row=0, column=0, padx=(0, 6))
-        self.lang_box = ttk.Combobox(row, width=26, state="readonly")
+        self.lang_box = ttk.Combobox(row, width=30, state="readonly")
         self.lang_box.grid(row=0, column=1, padx=(0, 6))
         self.lang_box.bind("<<ComboboxSelected>>", self.on_target_selected)
         self.btn_model = ttk.Button(row, command=self.install_model)
@@ -206,8 +345,9 @@ class App:
         row2.grid(row=9, column=0, sticky="ew", pady=3)
         self.btn_logs = ttk.Button(row2, command=lambda: open_folder(logs_dir()))
         self.btn_report = ttk.Button(row2, command=self.report)
+        self.btn_github = ttk.Button(row2, command=lambda: webbrowser.open(REPO_URL))
         self.btn_quit = ttk.Button(row2, command=self.quit)
-        self.stretch(row2, [self.btn_logs, self.btn_report, self.btn_quit])
+        self.stretch(row2, [self.btn_logs, self.btn_report, self.btn_github, self.btn_quit])
 
     def build_bulk(self):
         ttk, b = self.ttk, self.bulk_tab
@@ -239,6 +379,7 @@ class App:
         tf.rowconfigure(0, weight=1)
         cols = ("mod", "source", "texts", "words", "state", "folder")
         self.tree = ttk.Treeview(tf, columns=cols, show="headings", height=8)
+        enable_copy(self.tree)
         # everything centred in its column, except the mod name (left); the last column opens the mod's folder when clicked
         for c, w, a in (("mod", 230, "w"), ("source", 80, "center"), ("texts", 70, "center"), ("words", 80, "center"),
                         ("state", 190, "center"), ("folder", 110, "center")):
@@ -283,6 +424,7 @@ class App:
         tf.columnconfigure(0, weight=1)
         tf.rowconfigure(0, weight=1)
         self.log_tree = ttk.Treeview(tf, columns=("time", "kind", "msg"), show="headings", height=10)
+        enable_copy(self.log_tree)
         for c, w, a, st in (("time", 70, "center", False), ("kind", 90, "center", False), ("msg", 600, "w", True)):
             self.log_tree.column(c, width=w, anchor=a, stretch=st)
         self.log_tree.tag_configure("warning", foreground="#a15c00")
@@ -382,13 +524,15 @@ class App:
         self.log_hint.set_key("log_hint")
         self.lbl_log_filter.configure(text=t("log_filter"))
         i = max(0, self.log_filter_box.current())
-        self.log_filter_box.configure(values=[t("log_filter_" + k) if k in ("all", "problems") else t("log_kind_" + k) for k in self.LOG_FILTERS])
+        names = [t("log_filter_" + k) if k in ("all", "problems") else t("log_kind_" + k) for k in self.LOG_FILTERS]
+        self.log_filter_box.configure(values=names, width=fit_width(names, 14))
         self.log_filter_box.current(i)
         self.btn_log_copy.configure(text=t("log_copy"))
         self.btn_log_clear.configure(text=t("log_clear"))
         self.btn_log_folder.configure(text=t("logs_btn"))
         for col, key in (("time", "log_col_time"), ("kind", "log_col_kind"), ("msg", "log_col_msg")):
             self.log_tree.heading(col, text=t(key), anchor="center")
+        fit_columns(self.log_tree)
         self.render_log()
 
     def copy_log(self):
@@ -446,6 +590,7 @@ class App:
         self.btn_apply.configure(text=t("apply_btn"))
         self.btn_logs.configure(text=t("logs_btn"))
         self.btn_report.configure(text=t("report_btn"))
+        self.btn_github.configure(text=t("github_btn"))
         self.btn_quit.configure(text=t("quit_btn"))
         self.btn_add_dir.configure(text=t("bulk_add_dir"))
         self.btn_scan.configure(text=t("bulk_scan"))
@@ -458,12 +603,26 @@ class App:
         for col, key in (("mod", "col_mod"), ("source", "col_source"), ("texts", "col_texts"), ("words", "col_words"),
                          ("state", "col_state"), ("folder", "col_folder")):
             self.tree.heading(col, text=t(key), anchor="center")
+        fit_columns(self.tree)
         for f in self.fields:
             f.render()
         self.set_lang_choices(list(self.lang_codes.values()) or SUPPORTED_TARGETS)
         self.render_rows()
         self.apply_log_language()
         self.refresh_details_windows()
+        self.fit_window()
+
+    def fit_window(self):
+        """A longer language never cuts anything: the window can not be made narrower than what its widgets need (tabs, boxes and
+        buttons grow with their text), and it widens itself when it is already narrower than that."""
+        try:
+            self.root.update_idletasks()
+            need = self.root.winfo_reqwidth()
+            self.root.minsize(max(800, need), 520)
+            if self.root.winfo_width() > 1 and self.root.winfo_width() < need:
+                self.root.geometry(f"{need}x{self.root.winfo_height()}")
+        except Exception:  # noqa: BLE001
+            log.exception("could not fit the window to its texts")
 
     def on_ui_lang(self, _event=None):
         name = self.ui_box.get()
@@ -473,7 +632,7 @@ class App:
     def set_lang(self, code):
         self.lang = code
         i18n.save_choice(code)
-        self.ui_box.set(UI_NAMES.get(code, code))
+        self.ui_box.set(UI_NAMES.get(i18n.normalize_choice(code), code))
         self.apply_language()
         self.prepare_ui_texts()
 
@@ -501,7 +660,8 @@ class App:
                 return
             if err is not None:
                 log.warning("window texts for %s not prepared: %s", src, err)
-                self.lbl_ui_note.configure(text=i18n.tr("en", "ui_prepare_failed"))
+                reason = " ".join(str(err).split())
+                self.lbl_ui_note.configure(text=i18n.tr(self.lang, "ui_prepare_failed", err=(reason[:70] + "...") if len(reason) > 70 else reason))
                 return
             self.lbl_ui_note.configure(text="")
             self.apply_language()
@@ -533,10 +693,6 @@ class App:
 
     # ------------------------------------------------------------------ Home: status and target language
     def refresh_status(self):
-        port = self.httpd.server_address[1]
-        pairs = models.installed_pairs()
-        self.status.set_key("running", port=port)
-        self.status2.set_key("models", models=", ".join(pairs) or self.t("none"))
         self.refresh_target_info()
 
     def set_lang_choices(self, codes):
@@ -547,7 +703,7 @@ class App:
             shown.add(keep)
         choices = i18n.lang_choices(shown, self.lang)
         self.lang_codes = {label: code for label, code in choices}
-        self.lang_box.configure(values=[label for label, _ in choices])
+        self.lang_box.configure(values=[label for label, _ in choices], width=fit_width([label for label, _ in choices], 20))
         label = next((l for l, c in choices if c == keep), "")
         self.lang_box.set(label)
 
@@ -562,6 +718,9 @@ class App:
             return
         if config.get("target") != tgt:
             config.set("target", tgt)                       # the game mod reads this file
+        if tgt not in self.repaired:                         # once per language and run: fix translations an older version saved wrong
+            self.repaired.add(tgt)
+            threading.Thread(target=lambda: self._repair(tgt), daemon=True).start()
         label = i18n.lang_label(tgt, self.lang)
         ready = models.is_installed("en", tgt) or tgt == "en"
         if ready:
@@ -570,6 +729,12 @@ class App:
         else:
             self.target_msg.set_key("model_missing", lang=label)
             self.btn_model.grid()
+
+    def _repair(self, tgt):
+        try:
+            bulk.repair_all(tgt)
+        except Exception:  # noqa: BLE001
+            log.exception("repairing saved translations failed")
 
     def on_target_selected(self, _event=None):
         tgt = self.selected_target()
@@ -1017,7 +1182,7 @@ class App:
         cache = bulk.read_cache(tgt, top.package_id)
         skipped = saved.get("skipped", [])
         top.title(t("det_title", name=mod.name))
-        head = ttk.Label(top, anchor="w", justify="left", wraplength=800, padding=8,
+        head = selectable_label_class()(top, anchor="w", justify="left", wraplength=800,
                          text=t("det_summary", texts=saved.get("texts", 0), translated=saved.get("translated", 0), cached=saved.get("from_cache", 0),
                                 words=saved.get("words", 0), covered=saved.get("covered", 0), already=saved.get("already_target", 0),
                                 unsupported=len(saved.get("unsupported", [])), failed=saved.get("failed", 0))
@@ -1032,8 +1197,10 @@ class App:
             f.columnconfigure(0, weight=1)
             f.rowconfigure(0, weight=1)
             tv = ttk.Treeview(f, columns=[c for c, _ in cols], show="headings")
+            enable_copy(tv)
             for c, h in cols:
                 tv.heading(c, text=h)
+                fit_columns(tv)
                 tv.column(c, width=300, anchor="w", stretch=True)
             sbar = ttk.Scrollbar(f, orient="vertical", command=tv.yview)
             tv.configure(yscrollcommand=sbar.set)

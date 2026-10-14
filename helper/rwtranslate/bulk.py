@@ -20,7 +20,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import activity, config, langdetect, languages, logsetup, models, server, updater
+from . import activity, config, glossary, langdetect, languages, logsetup, models, server, updater
 from .paths import data_dir
 
 log = logsetup.get("bulk")
@@ -71,6 +71,31 @@ def write_cache(target, package_id, entries):
     tmp = p.with_name(p.name + ".tmp")
     tmp.write_text(json.dumps({"format": 1, "target": target, "entries": entries}, ensure_ascii=False, indent=0), encoding="utf-8")
     os.replace(tmp, p)
+
+
+def repair_all(target):
+    """Fix saved translations that an older version got wrong (glossary words like "safe" -> "cofre", a full stop on bare
+    labels). The game picks the changed files up by itself. Returns the number of entries fixed."""
+    d = data_dir() / "cache" / target
+    total = 0
+    if not d.is_dir():
+        return 0
+    for f in sorted(d.glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+            entries = data.get("entries", {})
+            n = glossary.repair_entries(entries, target)
+            if n:
+                data["entries"] = entries
+                tmp = f.with_name(f.name + ".tmp")
+                tmp.write_text(json.dumps(data, ensure_ascii=False, indent=0), encoding="utf-8")
+                os.replace(tmp, f)
+                total += n
+        except (OSError, ValueError, AttributeError):
+            log.warning("could not repair %s", f, exc_info=True)
+    if total:
+        log.info("repaired %d saved translation(s) for %s", total, target)
+    return total
 
 
 def clear_translations(target):
