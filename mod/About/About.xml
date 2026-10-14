@@ -7,7 +7,7 @@
     <li>1.6</li>
   </supportedVersions>
   <description>
-UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.013): expect bugs, and report them.
+UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.014): expect bugs, and report them.
 
 Automatically translates your OTHER installed mods (names, descriptions and interface texts) into your language, offline and for free. Texts that already have a translation are left alone. AI translation is not 100% perfect, but it is better than a mod that is not in your language.
 
@@ -21,7 +21,7 @@ Settings: Options > Mods > Auto Translate. Found a problem? Report it on GitHub.
 
 ----------------------------------------
 
-EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.013): podem existir erros, avise.
+EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.014): podem existir erros, avise.
 
 Traduz automaticamente os OUTROS mods que você instalou (nomes, descrições e textos de interface) para o seu idioma, sem internet e de graça. Textos que já têm tradução não são mexidos. A tradução por IA não é 100% perfeita, mas é melhor do que um mod que não está no seu idioma.
 
