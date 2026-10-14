@@ -4,6 +4,14 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.019 - 2026-10-14
+- Adicionado: imagem de capa do mod dentro do pacote (About/Preview.png), que o RimWorld mostra na tela de Mods e usa como capa ao publicar na Oficina da Steam; a conferência do pacote passou a exigir esse arquivo.
+- Alterado: na aba Início do executável, o botão "Abrir pasta de logs" foi trocado por "Abrir pasta de dados" (a pasta principal do mod em %LOCALAPPDATA%) e "Abrir pasta do mod" (onde o mod está instalado, achado em RimWorld\Mods, na Oficina da Steam, nas pastas adicionadas ou na pasta lembrada pelo programa; se não achar, avisa onde procurou).
+- Adicionado: os mesmos dois botões na aba Traduzir mods.
+- Alterado: na janela de detalhes de um mod, os textos que falharam aparecem em vermelho, no topo da aba "Não traduzidos pelo mod" (com um aviso no título da aba); a janela já abre nessa aba quando algo falhou e mostra "Por que falhou" com o erro. O erro passa a ser guardado a cada falha nova.
+- Alterado: README (português e inglês): o jogo é RimWorld 1.6 e 1.7 (a 1.7 ainda está em beta).
+- Corrigido: a compilação da 1.7 já roda no GitHub (o pacote da v0.018 trouxe a pasta 1.7).
+
 ## v0.018 - 2026-10-14
 - Adicionado: versão do mod para o RimWorld 1.7 (ainda em beta) em um projeto próprio (AutoTranslate17.csproj, .NET 10), que gera a pasta 1.7/Assemblies. O código compila contra a API pública da 1.7 alpha, mas ainda não foi testado dentro do jogo.
 - Alterado: o mod declara suporte às versões 1.6 e 1.7 (About.xml e LoadFolders.xml); o CI ganhou uma compilação da 1.7 que não bloqueia as outras e a Release inclui a pasta 1.7 quando ela compila (senão o zip sai só com a 1.6, com um aviso).

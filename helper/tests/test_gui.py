@@ -235,20 +235,50 @@ class Window(unittest.TestCase):
     def test_nothing_is_cut_off_in_a_longer_language(self):
         from rwtranslate import gui, i18n
         app = self.build(fake_fetcher(release_json("v0.0")))
-        long_text = {k: v + " " + "extra" * 6 for k, v in i18n.TEXT["en"].items() if k in ("tab_home", "tab_bulk", "tab_log", "check_btn", "apply_btn", "logs_btn", "report_btn", "github_btn", "quit_btn", "col_mod", "col_source", "col_texts", "col_words", "col_state", "col_folder")}
+        long_text = {k: v + " " + "extra" * 6 for k, v in i18n.TEXT["en"].items() if k in ("tab_home", "tab_bulk", "tab_log", "check_btn", "apply_btn", "data_folder_btn", "mod_folder_btn", "report_btn", "github_btn", "quit_btn", "col_mod", "col_source", "col_texts", "col_words", "col_state", "col_folder")}
         i18n.TEXT["xx"] = {**i18n.TEXT["en"], **long_text}
         try:
             app.lang = "xx"
             app.apply_language()
             self.root.update()
             self.assertGreaterEqual(self.root.winfo_width(), self.root.winfo_reqwidth())      # the window grew to fit
-            for b in (app.btn_check, app.btn_apply, app.btn_logs, app.btn_report, app.btn_github, app.btn_quit):
+            for b in (app.btn_check, app.btn_apply, app.btn_data, app.btn_modfolder, app.btn_report, app.btn_github, app.btn_quit):
                 self.assertGreaterEqual(b.winfo_width(), b.winfo_reqwidth())
             for c in app.tree["columns"]:
                 self.assertGreaterEqual(int(app.tree.column(c, "width")), len(app.tree.heading(c, "text")) * 4)
             self.assertGreaterEqual(int(str(app.ui_box.cget("width"))), max(len(v) for v in app.ui_box.cget("values")))
         finally:
             del i18n.TEXT["xx"]
+
+    def test_folder_buttons_open_the_data_folder_and_the_installed_mod(self):
+        from unittest import mock
+        from rwtranslate import gui
+        d = Path(tempfile.mkdtemp())
+        mods = d / "workshop" / "294100"
+        ours = mods / "123456789"
+        (ours / "About").mkdir(parents=True)
+        (ours / "About" / "About.xml").write_text("<ModMetaData><packageId>unknown1210.autotranslate</packageId></ModMetaData>")
+        other = mods / "555"
+        (other / "About").mkdir(parents=True)
+        (other / "About" / "About.xml").write_text("<ModMetaData><packageId>someone.else</packageId></ModMetaData>")
+        app = self.build(fake_fetcher(release_json("v0.0")), mod_dirs=[str(mods)])
+        self.assertEqual(str(app.btn_data.cget("text")), "Abrir pasta de dados")
+        self.assertEqual(str(app.btn_modfolder2.cget("text")), "Abrir pasta do mod")
+        self.assertFalse(hasattr(app, "btn_logs"))                                      # the logs button of the Home tab was replaced
+        with mock.patch.object(gui, "open_folder") as op:
+            app.btn_data.invoke()
+            app.btn_data2.invoke()
+            self.assertEqual(op.call_args_list[0][0][0], gui.data_dir())
+            self.assertEqual(op.call_args_list[1][0][0], gui.data_dir())
+            app.btn_modfolder.invoke()                                                    # found in the Workshop-like folder
+            self.assertEqual(Path(op.call_args_list[2][0][0]), ours)
+            app.btn_modfolder2.invoke()
+            self.assertEqual(Path(op.call_args_list[3][0][0]), ours)
+        app.mod_dirs_override = []
+        with mock.patch("tkinter.messagebox.showinfo") as info, mock.patch.object(gui, "open_folder") as op:
+            app.btn_modfolder.invoke()
+            self.assertEqual(op.call_count, 0)
+            self.assertIn("Auto Translate Mods", info.call_args[0][1])                    # told, not silent
 
     def test_every_text_exists_in_both_languages(self):
         from rwtranslate import i18n
@@ -465,6 +495,23 @@ class BulkTab(unittest.TestCase):
             r.update()
             self.assertIn("Tradução:", top.details["text"].get("1.0", "end"))
             self.assertIn("Detalhes: Alpha Mod", top.title())
+            # a text that failed: red row on top, the window opens on that tab and says why it failed
+            entry = app._details_entry("a.mod")
+            saved = dict(entry[2] or {})
+            saved["failed"] = 1
+            saved["skipped"] = list(saved.get("skipped", [])) + [{"text": "broken text", "reason": "failed", "detail": "EngineError: boom"}]
+            real_rows = app.plan_rows
+            app.plan_rows = [(m, st, (saved if m.package_id == "a.mod" else rr)) for m, st, rr in app.plan_rows]
+            top2 = app.show_details("a.mod")
+            sk = top2.details["skipped"]
+            first = sk.get_children()[0]
+            self.assertIn("failed", sk.item(first, "tags"), "the failed text is a red row, on top")
+            self.assertEqual(top2.details["nb"].index(top2.details["nb"].select()), 2, "the window opens on the tab with the failures")
+            self.assertIn("EngineError: boom", top2.details["text"].get("1.0", "end"))
+            self.assertIn("\u26a0", top2.details["nb"].tab(2, "text"))
+            top2.destroy()
+            app.details_windows = [w for w in app.details_windows if w is not top2]
+            app.plan_rows = real_rows
             # 3c) with the details window OPEN, changing the language of the main window redraws it too (same tab, same row)
             app.set_lang("en")
             self.assertEqual(top.title(), "Details: Alpha Mod")

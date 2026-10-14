@@ -6,6 +6,7 @@ import zipfile
 
 REQUIRED = [
     "AutoTranslate/About/About.xml",
+    "AutoTranslate/About/Preview.png",
     "AutoTranslate/LoadFolders.xml",
     "AutoTranslate/1.6/Assemblies/RimWorldAutoTranslate.dll",
     "AutoTranslate/Languages/English/Keyed/AutoTranslate.xml",

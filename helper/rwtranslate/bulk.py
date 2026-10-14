@@ -389,10 +389,10 @@ def _translate_group(src, target, texts, result, cancel, on_batch):
             for t in batch:
                 try:
                     out[t] = server.translate_texts(src, target, [t])[0]
-                except Exception:  # noqa: BLE001
+                except Exception as e:  # noqa: BLE001
                     result.failed += 1
                     if len(result.skipped) < SKIP_LIST_MAX:
-                        result.skipped.append({"text": t, "reason": "failed", "detail": ""})
+                        result.skipped.append({"text": t, "reason": "failed", "detail": " ".join(f"{type(e).__name__}: {e}".split())[:300]})
                     log.error("could not translate a text of %s: %r", result.package_id, t[:120], exc_info=True)
         on_batch(len(out))
     return out

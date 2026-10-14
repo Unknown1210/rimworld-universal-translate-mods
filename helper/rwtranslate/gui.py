@@ -15,7 +15,7 @@ import webbrowser
 from pathlib import Path
 
 from . import __version__, activity, bulk, config, diagnostics, i18n, languages, logsetup, models, server, uitext, updater
-from .paths import logs_dir
+from .paths import data_dir, logs_dir
 
 log = logsetup.get("gui")
 REPO_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods"
@@ -348,11 +348,12 @@ class App:
         self.stretch(row1, [self.btn_check, self.btn_apply])
         row2 = ttk.Frame(content)
         row2.grid(row=9, column=0, sticky="ew", pady=3)
-        self.btn_logs = ttk.Button(row2, command=lambda: open_folder(logs_dir()))
+        self.btn_data = ttk.Button(row2, command=self.open_data_folder)
+        self.btn_modfolder = ttk.Button(row2, command=self.open_mod_folder)
         self.btn_report = ttk.Button(row2, command=self.report)
         self.btn_github = ttk.Button(row2, command=lambda: webbrowser.open(REPO_URL))
         self.btn_quit = ttk.Button(row2, command=self.quit)
-        self.stretch(row2, [self.btn_logs, self.btn_report, self.btn_github, self.btn_quit])
+        self.stretch(row2, [self.btn_data, self.btn_modfolder, self.btn_report, self.btn_github, self.btn_quit])
 
     def build_bulk(self):
         ttk, b = self.ttk, self.bulk_tab
@@ -364,8 +365,16 @@ class App:
         self.dirs_frame.columnconfigure(0, weight=1)
         self.dir_labels = []                    # [(path label, tag label or None)] of the rows drawn by render_dirs
         self.dir_rows = []
-        btns = ttk.Frame(b)
-        btns.grid(row=2, column=0, sticky="ew", pady=3)
+        outer = ttk.Frame(b)
+        outer.grid(row=2, column=0, sticky="ew", pady=3)
+        outer.columnconfigure(0, weight=1)
+        btns = ttk.Frame(outer)
+        btns.grid(row=0, column=0, sticky="ew")
+        btns2 = ttk.Frame(outer)                                  # the same two folder buttons as on the Home tab
+        btns2.grid(row=1, column=0, sticky="ew", pady=(3, 0))
+        self.btn_data2 = ttk.Button(btns2, command=self.open_data_folder)
+        self.btn_modfolder2 = ttk.Button(btns2, command=self.open_mod_folder)
+        self.stretch(btns2, [self.btn_data2, self.btn_modfolder2], uniform=False)
         self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
         self.btn_scan = ttk.Button(btns, command=self.refresh_plan)
         self.btn_bulk = ttk.Button(btns, command=lambda: self.start_bulk(False), state="disabled")
@@ -593,7 +602,10 @@ class App:
         self.btn_model.configure(text=t("download_model"))
         self.btn_check.configure(text=t("check_btn"))
         self.btn_apply.configure(text=t("apply_btn"))
-        self.btn_logs.configure(text=t("logs_btn"))
+        self.btn_data.configure(text=t("data_folder_btn"))
+        self.btn_modfolder.configure(text=t("mod_folder_btn"))
+        self.btn_data2.configure(text=t("data_folder_btn"))
+        self.btn_modfolder2.configure(text=t("mod_folder_btn"))
         self.btn_report.configure(text=t("report_btn"))
         self.btn_github.configure(text=t("github_btn"))
         self.btn_quit.configure(text=t("quit_btn"))
@@ -850,6 +862,36 @@ class App:
         except Exception as e:  # noqa: BLE001
             log.exception("report failed")
             self.progress.set_key("report_failed", err=e)
+
+    # ------------------------------------------------------------------ folders
+    def open_data_folder(self):
+        """The mod's main folder in the user's data (%LOCALAPPDATA%\\RimWorldAutoTranslate): models, translations, overrides and logs."""
+        open_folder(data_dir())
+
+    def installed_mod_dir(self):
+        """Where the Auto Translate mod is installed: RimWorld/Mods, the Steam Workshop folder, any folder added in the Translate mods tab,
+        or the folder remembered by the updater. None when it is not found."""
+        if self.mod_dir_override:
+            return Path(self.mod_dir_override)
+        found = updater.find_mod_dir()
+        if found:
+            return Path(found)
+        for d in self.dirs():
+            try:
+                for child in sorted(Path(d).iterdir()):
+                    if child.is_dir() and updater._is_our_mod(child):
+                        return child
+            except OSError:
+                continue
+        return None
+
+    def open_mod_folder(self):
+        folder = self.installed_mod_dir()
+        if folder is None:
+            from tkinter import messagebox
+            messagebox.showinfo(self.t("title"), self.t("mod_folder_missing"), parent=self.root)
+            return
+        open_folder(folder)
 
     # ------------------------------------------------------------------ Translate all mods
     def dirs(self):
@@ -1211,8 +1253,10 @@ class App:
             tv.configure(yscrollcommand=sbar.set)
             tv.grid(row=0, column=0, sticky="nsew")
             sbar.grid(row=0, column=1, sticky="ns")
-            for vals, texts in rows:
-                full[tv.insert("", "end", values=[self._one_line(v) for v in vals])] = texts
+            tv.tag_configure("failed", foreground="#b00020", background="#fde8e8")      # a text that failed to translate: red row
+            for row in rows:
+                vals, texts = row[0], row[1]
+                full[tv.insert("", "end", values=[self._one_line(v) for v in vals], tags=("failed",) if len(row) > 2 and row[2] else ())] = texts
             nb.add(f, text=title)
             return tv
 
@@ -1227,11 +1271,16 @@ class App:
         tv3.column("w", width=90, minwidth=70, stretch=False, anchor="center")
         tv3.heading("w", anchor="center")
         reasons = {"covered": lambda d: t("r_covered", provider=d), "already_target": lambda d: t("r_already"),
-                   "unsupported": lambda d: t("r_unsupported", pair=d), "failed": lambda d: t("r_failed")}
+                   "unsupported": lambda d: t("r_unsupported", pair=d),
+                   "failed": lambda d: t("r_failed") + (": " + d if d else "")}
         # not translated by us: the text, how it reads now (the translation that already exists, if any) and why it was left alone
-        tv2 = make_tab(t("det_tab_skipped", n=len(skipped)), [("o", t("det_col_orig")), ("e", t("det_col_existing")), ("r", t("det_col_reason"))],
+        n_failed = sum(1 for x in skipped if x["reason"] == "failed")
+        failed_first = sorted(skipped, key=lambda x: x["reason"] != "failed")          # the failures on top, in red
+        tv2 = make_tab(t("det_tab_skipped", n=len(skipped)) + (" \u26a0" if n_failed else ""),
+                       [("o", t("det_col_orig")), ("e", t("det_col_existing")), ("r", t("det_col_reason"))],
                        [((x["text"], x.get("translation", ""), reasons.get(x["reason"], lambda d: x["reason"])(x.get("detail", ""))),
-                         (x["text"], x.get("translation", ""))) for x in skipped])
+                         (x["text"], x.get("translation", ""), x.get("detail", "") if x["reason"] == "failed" else ""), x["reason"] == "failed")
+                        for x in failed_first])
         # the selected row in full: descriptions are long
         box = ttk.Frame(top)
         box.grid(row=2, column=0, sticky="ew", padx=8, pady=6)
@@ -1241,10 +1290,11 @@ class App:
         txt.configure(state="disabled")
 
         def show_full(tv, iid):
-            o, tr = full.get(iid, ("", ""))
+            o, tr, why = (tuple(full.get(iid, ("", ""))) + ("",))[:3]
             txt.configure(state="normal")
             txt.delete("1.0", "end")
-            txt.insert("end", t("det_full_orig") + "\n" + o + ("\n\n" + t("det_full_trans") + "\n" + tr if tr else ""))
+            txt.insert("end", t("det_full_orig") + "\n" + o + ("\n\n" + t("det_full_trans") + "\n" + tr if tr else "")
+                       + ("\n\n" + t("det_full_why") + "\n" + why if why else ""))
             txt.configure(state="disabled")
 
         def on_select(event):
@@ -1260,6 +1310,12 @@ class App:
             txt.configure(state="disabled")
         ttk.Button(top, text=t("det_close"), command=top.destroy).grid(row=3, column=0, pady=(0, 8))
         top.details = {"translated": tv1, "words": tv3, "skipped": tv2, "text": txt, "full": full, "nb": nb, "tabs": [tv1, tv3, tv2]}
+        if n_failed and not keep_sel:                          # something failed: open on the tab where the red rows are
+            nb.select(2)
+            first = tv2.get_children()
+            if first:
+                tv2.selection_set(first[0])
+                show_full(tv2, first[0])
         if keep_sel:                                           # same tab and same row as before the redraw
             try:
                 nb.select(keep_sel[0])
