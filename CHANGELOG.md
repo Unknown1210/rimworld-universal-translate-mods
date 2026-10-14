@@ -4,6 +4,12 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.018 - 2026-10-14
+- Adicionado: versão do mod para o RimWorld 1.7 (ainda em beta) em um projeto próprio (AutoTranslate17.csproj, .NET 10), que gera a pasta 1.7/Assemblies. O código compila contra a API pública da 1.7 alpha, mas ainda não foi testado dentro do jogo.
+- Alterado: o mod declara suporte às versões 1.6 e 1.7 (About.xml e LoadFolders.xml); o CI ganhou uma compilação da 1.7 que não bloqueia as outras e a Release inclui a pasta 1.7 quando ela compila (senão o zip sai só com a 1.6, com um aviso).
+- Alterado: README (português e inglês) cita a versão em teste para a 1.7; a capa do mod diz "RimWorld 1.6 / 1.7".
+- Alterado: tools/set_version.py também atualiza a versão do novo projeto.
+
 ## v0.017 - 2026-10-14
 - Alterado: capa do mod: faixa diagonal "Leia a descrição / Read the description" com "Instalação e downloads no GitHub", e a palavra "offline" saiu (a frase agora diz só que traduz automaticamente).
 - Corrigido: README (português e inglês) e descrição do mod no jogo diziam que funciona "sem internet"/"offline"; agora dizem que a tradução é no seu computador, de graça, e que não precisa de internet depois de baixar o modelo do idioma uma vez.

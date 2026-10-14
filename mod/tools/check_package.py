@@ -13,6 +13,8 @@ REQUIRED = [
     "AutoTranslate/Languages/Portuguese/Keyed/AutoTranslate.xml",
 ]
 names = set(zipfile.ZipFile(sys.argv[1]).namelist())
+if "AutoTranslate/1.7/Assemblies/RimWorldAutoTranslate.dll" not in names:
+    print("NOTE: no RimWorld 1.7 build in this package (1.7 is in beta; the 1.6 build is complete)")
 missing = [r for r in REQUIRED if r not in names]
 for m in missing:
     print("MISSING in package:", m)

@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    The same source as AutoTranslate.csproj, built for RimWorld 1.7 (the game moved to .NET 10, so it needs its own build; the
+    1.6 build stays as it is). Needs the .NET 10 SDK. It uses the public Krafs.Rimworld.Ref reference package for 1.7.
+    Build:  dotnet build mod/AutoTranslate17.csproj -c Release
+    Output: mod/1.7/Assemblies/RimWorldAutoTranslate.dll
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>RimWorldAutoTranslate</AssemblyName>
+    <RootNamespace>AutoTranslate</RootNamespace>
+    <LangVersion>7.3</LangVersion>
+    <Version>0.018.0</Version>
+    <OutputPath>1.7/Assemblies/</OutputPath>
+    <BaseIntermediateOutputPath>obj17/</BaseIntermediateOutputPath>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <DebugType>portable</DebugType>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <NoWarn>$(NoWarn);CS0618;SYSLIB0001</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Source/**/*.cs" />
+    <EmbeddedResource Include="Languages/English/Keyed/AutoTranslate.xml" LogicalName="AutoTranslate.English.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Krafs.Rimworld.Ref" Version="1.7.4977-alpha.2" PrivateAssets="all" />
+    <PackageReference Include="Lib.Harmony.Ref" Version="2.3.3" ExcludeAssets="runtime" />
+  </ItemGroup>
+</Project>

@@ -53,11 +53,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
-        with: { dotnet-version: "8.0.x" }
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
       - run: sudo apt-get update && sudo apt-get install -y mono-mcs mono-devel
       - run: mod/tools/run-tests.sh
       - name: Build against the public RimWorld 1.6 reference assemblies
         run: dotnet build mod/AutoTranslate.csproj -c Release -p:RimWorldDir=/nonexistent
+      - name: Build for RimWorld 1.7 (beta; best effort, the zip is still made without it if this fails)
+        continue-on-error: true
+        run: dotnet build mod/AutoTranslate17.csproj -c Release
       - name: Assemble the mod folder
         run: |
           mkdir -p pkg/AutoTranslate/1.6/Assemblies
@@ -65,6 +71,12 @@ jobs:
           cp mod/LoadFolders.xml pkg/AutoTranslate/
           cp -r mod/Languages pkg/AutoTranslate/Languages
           cp mod/1.6/Assemblies/RimWorldAutoTranslate.dll pkg/AutoTranslate/1.6/Assemblies/
+          if [ -f mod/1.7/Assemblies/RimWorldAutoTranslate.dll ]; then
+            mkdir -p pkg/AutoTranslate/1.7/Assemblies
+            cp mod/1.7/Assemblies/RimWorldAutoTranslate.dll pkg/AutoTranslate/1.7/Assemblies/
+          else
+            echo "::warning::the RimWorld 1.7 build is not in the zip"
+          fi
           cd pkg && zip -r ../UniversalTranslate-Mod.zip AutoTranslate
           cd .. && python3 mod/tools/check_package.py UniversalTranslate-Mod.zip
       - uses: actions/upload-artifact@v4

@@ -35,3 +35,12 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: "8.0.x" }
       - run: dotnet build mod/AutoTranslate.csproj -c Release -p:RimWorldDir=/nonexistent
+  mod-build-17:
+    # RimWorld 1.7 is still in beta (public reference package 1.7.x-alpha): this build is informational and never blocks the rest.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with: { dotnet-version: "10.0.x" }
+      - run: dotnet build mod/AutoTranslate17.csproj -c Release
