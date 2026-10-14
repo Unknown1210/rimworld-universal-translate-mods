@@ -4,6 +4,12 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.021 - 2026-10-14
+- Alterado: os READMEs foram reorganizados: o texto em português passou a ser README.br.md, o inglês continua README.en.md e o README.md virou uma página de entrada curta e bilíngue, com os botões de idioma, a versão atual e os links de licença, créditos e changelog.
+- Alterado: tools/set_version.py passou a atualizar a versão nos três READMEs.
+- Removido: o arquivo CLAUDE.md saiu do repositório (ficou no .gitignore e uma cópia está guardada fora do GitHub).
+- Alterado: no THIRD_PARTY_NOTICES.md, a seção "Not included / Não incluídos" ficou com o parágrafo em inglês, uma linha em branco e o parágrafo em português.
+
 ## v0.020 - 2026-10-14
 - Adicionado: licença MIT do código (arquivo LICENSE), com o pedido de que quem usar ou adaptar o código (inclusive em complementos) cite o autor e o link do repositório; a licença é citada nos dois READMEs e na descrição do mod.
 - Adicionado: THIRD_PARTY_NOTICES.md com os créditos e as licenças de terceiros usados (Harmony, CTranslate2, SentencePiece, NumPy, PyYAML, Python, PyInstaller e o Argos Translate, cujos modelos não fazem parte do projeto); ele é citado nos dois READMEs e na descrição do mod.

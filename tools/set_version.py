@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Sync the project version everywhere from the VERSION file ("0.NNN"), or set it: tools/set_version.py 0.002
 
-Files updated: helper/pyproject.toml, helper/rwtranslate/__init__.py, mod/AutoTranslate.csproj, mod/AutoTranslate17.csproj, README.md and README.en.md (the "current version" mentions).
+Files updated: helper/pyproject.toml, helper/rwtranslate/__init__.py, mod/AutoTranslate.csproj, mod/AutoTranslate17.csproj, README.md (language chooser), README.br.md (Portuguese) and README.en.md (the "current version" mentions).
 `--check` only verifies they match (used by CI). Format is 0.NNN (three digits: 0.001, 0.002, ...) while the project is pre-1.0;
 the 3-part form 0.NNN.0 is used where the toolchain requires it (pip, .NET).
 """
@@ -21,8 +21,9 @@ def targets(v):
     return [
         (ROOT / "helper/pyproject.toml", r'(?m)^version = "[^"]+"', f'version = "{t}"'),
         (ROOT / "helper/rwtranslate/__init__.py", r'__version__ = "[^"]+"', f'__version__ = "{t}"'),
-        (ROOT / "README.md", r"\*\*Versão atual: [^*]+\*\*", f"**Versão atual: {v}**"),
-        (ROOT / "README.md", r"\(versão atual [^)]*\)", f"(versão atual {v})"),
+        (ROOT / "README.br.md", r"\*\*Versão atual: [^*]+\*\*", f"**Versão atual: {v}**"),
+        (ROOT / "README.br.md", r"\(versão atual [^)]*\)", f"(versão atual {v})"),
+        (ROOT / "README.md", r"<b>Versão atual / Current version: [^<]+</b>", f"<b>Versão atual / Current version: {v}</b>"),
         (ROOT / "README.en.md", r"\*\*Current version: [^*]+\*\*", f"**Current version: {v}**"),
         (ROOT / "README.en.md", r"\(current version [^)]*\)", f"(current version {v})"),
         (ROOT / "mod/AutoTranslate.csproj", r"<Version>[^<]+</Version>", f"<Version>{t}</Version>"),

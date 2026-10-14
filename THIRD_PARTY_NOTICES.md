@@ -37,6 +37,8 @@ variar de um modelo para outro; confira a do modelo que você usa.
 
 ## Not included / Não incluídos
 
-RimWorld, its art and its name belong to Ludeon Studios; the game's libraries are used only to build the mod (through the public reference
-package) and are not redistributed here. / O RimWorld, a arte e o nome pertencem à Ludeon Studios; as bibliotecas do jogo são usadas só para
-compilar o mod (pelo pacote público de referência) e não são redistribuídas aqui.
+RimWorld, its art and its name belong to Ludeon Studios. The game's libraries are used only to build the mod (through the public reference
+package) and are not redistributed here.
+
+O RimWorld, a arte e o nome pertencem à Ludeon Studios. As bibliotecas do jogo são usadas só para compilar o mod (pelo pacote público de
+referência) e não são redistribuídas aqui.
