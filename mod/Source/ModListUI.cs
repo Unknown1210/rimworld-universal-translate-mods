@@ -29,13 +29,36 @@ namespace AutoTranslate
                 all++;
                 if (q.Length == 0 || m.Name.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0 || m.Id.IndexOf(q, StringComparison.CurrentCultureIgnoreCase) >= 0) mods.Add(m);
             }
-            Widgets.Label(new Rect(rect.x, rect.y, rect.width, 26f), T.Get("AT_Mods", q.Length == 0 ? all.ToString() : mods.Count + "/" + all) + "  -  " + T.Get("AT_ModsHint"));
-            // search box (filters the list below) and the "apply to all shown" menu
-            float sw = Math.Min(260f, rect.width * 0.4f);
-            Widgets.Label(new Rect(rect.x, rect.y + 28f, 130f, 26f), T.Get("AT_Search"));
-            search = Widgets.TextField(new Rect(rect.x + 130f, rect.y + 28f, sw, 26f), search ?? "");
-            float aw = Math.Min(320f, rect.width - sw - 150f);
-            if (aw > 120f && Widgets.ButtonText(new Rect(rect.x + rect.width - aw, rect.y + 28f, aw, 26f), T.Get("AT_ApplyAll", mods.Count)))
+            // A card of its own, set apart from the options above it
+            Widgets.DrawMenuSection(rect);
+            Rect inner = rect.ContractedBy(10f);
+            GameFont old0 = Text.Font;
+            Text.Font = GameFont.Medium;
+            Widgets.Label(new Rect(inner.x, inner.y, inner.width, 30f), T.Get("AT_Mods", q.Length == 0 ? all.ToString() : mods.Count + "/" + all));
+            Text.Font = GameFont.Tiny;
+            Widgets.Label(new Rect(inner.x, inner.y + 30f, inner.width, 20f), T.Get("AT_ModsHint"));
+            Text.Font = old0;
+            // one toolbar line: search on the left, the two bulk buttons on the right, all the same height
+            float ty = inner.y + 56f, th = 28f;
+            Widgets.Label(new Rect(inner.x, ty + 2f, 110f, th), T.Get("AT_Search"));
+            search = Widgets.TextField(new Rect(inner.x + 112f, ty, Math.Min(230f, inner.width * 0.32f), th), search ?? "");
+            float left = 112f + Math.Min(230f, inner.width * 0.32f) + 12f;
+            float avail = Math.Max(0f, inner.width - left);
+            float applyW = Math.Max(120f, avail * 0.56f), diagW = Math.Max(110f, avail - applyW - 8f);
+            float rx = inner.x + inner.width;
+            if (Widgets.ButtonText(new Rect(rx - diagW, ty, diagW, th), T.Get("AT_DiagAll")))
+            {
+                var shownForReport = new List<ModState>(mods);
+                Safe.Run("diagnose-all", () =>
+                {
+                    string report = Pipeline.DiagnoseAll(shownForReport);
+                    string file = Pipeline.SaveDiagnosticFile(report);
+                    GUIUtility.systemCopyBuffer = report;
+                    Messages.Message(T.Get("AT_DiagAllSaved", shownForReport.Count, file), RimWorld.MessageTypeDefOf.SilentInput, false);
+                    try { Application.OpenURL(System.IO.Path.GetDirectoryName(file)); } catch { }
+                });
+            }
+            if (Widgets.ButtonText(new Rect(rx - diagW - 8f - applyW, ty, applyW, th), T.Get("AT_ApplyAll", mods.Count)))
             {
                 var shown = new List<ModState>(mods);
                 var opts = new List<FloatMenuOption>();
@@ -50,7 +73,9 @@ namespace AutoTranslate
                     opts.Add(new FloatMenuOption(T.Get("AT_ReenableAll", disabledShown.Count), () => { foreach (ModState dm in disabledShown) Pipeline.Reenable(dm); }));
                 Find.WindowStack.Add(new FloatMenu(opts));
             }
-            var outRect = new Rect(rect.x, rect.y + 58f, rect.width, Math.Max(40f, rect.height - 58f));
+            Widgets.DrawLineHorizontal(inner.x, ty + th + 6f, inner.width);
+            float top = ty + th + 12f;
+            var outRect = new Rect(inner.x, top, inner.width, Math.Max(40f, inner.y + inner.height - top));
             var view = new Rect(0f, 0f, outRect.width - 18f, mods.Count * RowH);
             Widgets.BeginScrollView(outRect, ref scroll, view);
             float y = 0f;
@@ -58,25 +83,15 @@ namespace AutoTranslate
             {
                 var row = new Rect(0f, y, view.width, RowH - 4f);
                 Widgets.DrawHighlightIfMouseover(row);
-                float w = view.width, split = w * 0.60f;
-                Widgets.Label(new Rect(row.x + 4f, row.y, split - 108f, 24f), ms.Name + "  (" + ms.Id + ")");
-                if (Widgets.ButtonText(new Rect(row.x + split - 100f, row.y + 1f, 96f, 22f), T.Get("AT_BtnDiag")))
-                {
-                    ModState dm = ms;
-                    Safe.Run("diagnose", () =>
-                    {
-                        string report = Pipeline.DiagnoseMod(dm);
-                        GUIUtility.systemCopyBuffer = report;
-                        AtLog.Info("diagnose", report);
-                        Messages.Message(T.Get("AT_DiagCopied", dm.Name), RimWorld.MessageTypeDefOf.SilentInput, false);
-                    });
-                }
+                float w = view.width, split = w * 0.58f;
+                Widgets.Label(new Rect(row.x + 4f, row.y, split - 8f, 24f), ms.Name + "  (" + ms.Id + ")");
                 GameFont old = Text.Font;
                 Text.Font = GameFont.Tiny;
                 Widgets.Label(new Rect(row.x + 4f, row.y + 24f, split - 8f, RowH - 28f), ms.StatusTextUi());
                 Text.Font = old;
 
                 float bx = row.x + split + 8f, bw = w - split - 14f;
+                float modeW = bw * 0.62f, diagW2 = bw - modeW - 4f;
                 bool on = ms.Active, was = on;
                 Widgets.CheckboxLabeled(new Rect(bx, row.y, bw, 26f), T.Get("AT_Enabled"), ref on);
                 if (on != was)
@@ -87,12 +102,12 @@ namespace AutoTranslate
                 }
                 if (ms.AutoDisabled)
                 {
-                    if (Widgets.ButtonText(new Rect(bx, row.y + 30f, bw, 26f), T.Get("AT_Reenable"))) Pipeline.Reenable(ms);
+                    if (Widgets.ButtonText(new Rect(bx, row.y + 30f, modeW, 26f), T.Get("AT_Reenable"))) Pipeline.Reenable(ms);
                 }
                 else if (ms.Mode != ModMode.Off)
                 {
                     ModState cur = ms;
-                    if (Widgets.ButtonText(new Rect(bx, row.y + 30f, bw, 26f), ModMode.Label(ms.Mode)))
+                    if (Widgets.ButtonText(new Rect(bx, row.y + 30f, modeW, 26f), ModMode.Label(ms.Mode)))
                     {
                         var opts = new List<FloatMenuOption>();
                         foreach (string mode in ModMode.All)
@@ -103,6 +118,17 @@ namespace AutoTranslate
                         }
                         Find.WindowStack.Add(new FloatMenu(opts));
                     }
+                }
+                if (Widgets.ButtonText(new Rect(bx + modeW + 4f, row.y + 30f, diagW2, 26f), T.Get("AT_BtnDiag")))
+                {
+                    ModState dm = ms;
+                    Safe.Run("diagnose", () =>
+                    {
+                        string report = Pipeline.DiagnoseMod(dm);
+                        GUIUtility.systemCopyBuffer = report;
+                        AtLog.Info("diagnose", report);
+                        Messages.Message(T.Get("AT_DiagCopied", dm.Name), RimWorld.MessageTypeDefOf.SilentInput, false);
+                    });
                 }
                 y += RowH;
             }

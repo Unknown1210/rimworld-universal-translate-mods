@@ -407,7 +407,7 @@ class BulkTab(unittest.TestCase):
             # 3c) with the details window OPEN, changing the language of the main window redraws it too (same tab, same row)
             app.set_lang("en")
             self.assertEqual(top.title(), "Details: Alpha Mod")
-            self.assertEqual(top.details["nb"].tab(0, "text"), "Translated (2)")
+            self.assertEqual(top.details["nb"].tab(0, "text"), "Translated texts (2)")
             self.assertEqual(top.details["nb"].tab(1, "text"), "Words translated (7)")
             self.assertEqual(top.details["skipped"].heading("e")["text"], "Existing translation")
             self.assertEqual(top.details["translated"].heading("o")["text"], "Original")

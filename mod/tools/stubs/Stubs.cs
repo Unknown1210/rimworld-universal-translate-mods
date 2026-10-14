@@ -139,12 +139,15 @@ namespace Verse
     {
         public static void Look<K, V>(ref Dictionary<K, V> dict, string label, LookMode keyLook, LookMode valueLook) { }
     }
+    public static class GenUI { public static UnityEngine.Rect ContractedBy(this UnityEngine.Rect r, float m) { return new UnityEngine.Rect(r.x + m, r.y + m, r.width - 2 * m, r.height - 2 * m); } }
     public static class Widgets
     {
         public static void Label(UnityEngine.Rect r, string s) { }
         public static bool ButtonText(UnityEngine.Rect r, string s) { return false; }
         public static void CheckboxLabeled(UnityEngine.Rect r, string label, ref bool checkOn) { }
         public static void DrawHighlightIfMouseover(UnityEngine.Rect r) { }
+        public static void DrawMenuSection(UnityEngine.Rect r) { }
+        public static void DrawLineHorizontal(float x, float y, float length) { }
         public static string TextField(UnityEngine.Rect rect, string text) { return text; }
         public static void BeginScrollView(UnityEngine.Rect outRect, ref UnityEngine.Vector2 pos, UnityEngine.Rect view) { }
         public static void EndScrollView() { }

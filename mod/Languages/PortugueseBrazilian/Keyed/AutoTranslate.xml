@@ -16,11 +16,13 @@
   <AT_ApplyOnClose>As mudanças valem quando você fechar esta janela.</AT_ApplyOnClose>
   <AT_HelperProblem>Programa tradutor: {0}</AT_HelperProblem>
   <AT_Search>Pesquisar mod:</AT_Search>
-  <AT_ApplyAll>Aplicar a todos os exibidos ({0})...</AT_ApplyAll>
+  <AT_ApplyAll>Aplicar a todos ({0})...</AT_ApplyAll>
   <AT_ApplyAllTo>Todos os {1} exibidos: {0}</AT_ApplyAllTo>
   <AT_BtnDiag>Diagnóstico</AT_BtnDiag>
   <AT_DiagCopied>Diagnóstico de '{0}' copiado: cole numa mensagem.</AT_DiagCopied>
   <AT_ReenableAll>Religar as traduções dos {0} mod(s) exibidos desligados por problemas</AT_ReenableAll>
+  <AT_DiagAll>Diagnóstico de todos</AT_DiagAll>
+  <AT_DiagAllSaved>Diagnóstico de {0} mod(s) copiado e salvo em: {1}</AT_DiagAllSaved>
   <AT_Mods>Mods ({0})</AT_Mods>
   <AT_ModsHint>Só os textos que ainda não têm tradução são traduzidos.</AT_ModsHint>
   <AT_Enabled>Ativado</AT_Enabled>

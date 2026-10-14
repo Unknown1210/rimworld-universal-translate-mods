@@ -2,12 +2,12 @@
 
 <div align="justify">
 
-**Versão atual: 0.009** · [Baixar na aba Releases](../../releases/latest)
+**Versão atual: 0.010** · [Baixar na aba Releases](../../releases/latest)
 
 Traduz **automaticamente** os outros mods do seu jogo para o seu idioma, **sem precisar de um mod de tradução para cada mod**.
 A tradução é feita **no seu computador, sem internet e de graça**. Cada tradução fica salva, então ela só é feita uma vez.
 
-> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.009). Veja "Estado atual" abaixo.
+> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.010). Veja "Estado atual" abaixo.
 
 <h2 align="left">Compatibilidade</h2>
 
@@ -66,7 +66,7 @@ Na aba **Traduzir mods** do executável:
 - **Parar:** interrompe; o que já foi traduzido fica salvo.<br><sub>────────────</sub>
 - **Excluir traduções:** apaga todas as traduções salvas do idioma escolhido (pergunta antes de apagar). Os mods voltam a aparecer como novos. Suas correções manuais (`overrides`) são mantidas.<br><sub>────────────</sub>
 - **Coluna "Pasta":** clique em "Abrir pasta" na linha de um mod para abrir a pasta dele no explorador de arquivos.<br><sub>────────────</sub>
-- **Dois cliques em um mod** (fora da coluna "Pasta") abrem uma janela com três abas: **Traduzidos** (original e tradução; o texto completo aparece ao selecionar), **Palavras traduzidas** (os mesmos textos com o número de palavras de cada um) e **Não traduzidos por nós** (original, **tradução existente** e o motivo: "já tem tradução", "já está no seu idioma", "sem suporte", "falhou"). Se você trocar o idioma da janela com essa tela aberta, ela muda de idioma na hora.<br><sub>────────────</sub>
+- **Dois cliques em um mod** (fora da coluna "Pasta") abrem uma janela com três abas: **Textos traduzidos** (original e tradução; o texto completo aparece ao selecionar), **Palavras traduzidas** (os mesmos textos com o número de palavras de cada um) e **Não traduzidos pelo mod** (original, **tradução existente** e o motivo: "já tem tradução", "já está no seu idioma", "sem suporte", "falhou"). Se você trocar o idioma da janela com essa tela aberta, ela muda de idioma na hora.<br><sub>────────────</sub>
 - As traduções ficam no mesmo cache que o jogo usa, então ao jogar elas já estão prontas. **Se o jogo já estiver aberto**, ele aplica as traduções **em tempo real, mod por mod**: assim que o programa termina de traduzir um mod, o jogo aplica só o que mudou naquele mod, sem reiniciar e sem recarregar os outros. **Sem pesar o jogo:** enquanto o programa não está traduzindo, o jogo só olha um arquivo-sinal minúsculo a cada 5 segundos (custo quase zero); só enquanto o sinal existe ele confere os arquivos, a cada segundo e meio; quando o programa termina, o jogo faz uma conferência final e volta a ficar quieto. Por exemplo, ao traduzir um mod de paletes, o nome e a descrição dos paletes mudam na tela em instantes. É um adiantamento: ele lê os arquivos XML dos mods; textos que só existem durante o jogo (ou que dependem de outros mods) são traduzidos pelo mod na hora, como sempre. **Para esses, abra o programa antes de iniciar o RimWorld e jogue com ele aberto**: o jogo pede a tradução, o programa traduz e salva no cache, e nas próximas vezes já fica pronto. Se a tradução não aparecer no jogo, reinicie o jogo.
 
 <h2 align="left">Aba Log (o que o programa está fazendo)</h2>
@@ -116,7 +116,7 @@ Com o **modo desenvolvedor** do RimWorld ligado, o próprio jogo marca os textos
 
 <h2 align="left">Estado atual (transparência)</h2>
 
-Esta é uma **versão inicial** (versão atual 0.009), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. A tradução automática pode errar. Ainda **não foi validado**: a tradução com os modelos reais em mods de verdade (os testes usam tradutores falsos) e a tela do mod dentro do jogo.
+Esta é uma **versão inicial** (versão atual 0.010), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. A tradução automática pode errar. Ainda **não foi validado**: a tradução com os modelos reais em mods de verdade (os testes usam tradutores falsos) e a tela do mod dentro do jogo.
 
 <h2 align="left">Deu problema ou conflito com um mod?</h2>
 

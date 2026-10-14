@@ -16,11 +16,13 @@
   <AT_ApplyOnClose>Changes apply when you close this window.</AT_ApplyOnClose>
   <AT_HelperProblem>Translator program: {0}</AT_HelperProblem>
   <AT_Search>Search mods:</AT_Search>
-  <AT_ApplyAll>Apply to all shown ({0})...</AT_ApplyAll>
+  <AT_ApplyAll>Apply to all ({0})...</AT_ApplyAll>
   <AT_ApplyAllTo>All {1} shown: {0}</AT_ApplyAllTo>
   <AT_BtnDiag>Diagnostic</AT_BtnDiag>
   <AT_DiagCopied>Diagnostic of '{0}' copied: paste it in a message.</AT_DiagCopied>
   <AT_ReenableAll>Turn translations back on for the {0} shown mod(s) switched off after problems</AT_ReenableAll>
+  <AT_DiagAll>Diagnostic of all</AT_DiagAll>
+  <AT_DiagAllSaved>Diagnostic of {0} mod(s) copied and saved to: {1}</AT_DiagAllSaved>
   <AT_Mods>Mods ({0})</AT_Mods>
   <AT_ModsHint>Only texts that have no translation yet are translated.</AT_ModsHint>
   <AT_Enabled>Enabled</AT_Enabled>

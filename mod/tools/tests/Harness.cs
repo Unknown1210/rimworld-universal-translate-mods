@@ -100,6 +100,8 @@ public static class Harness
         Scenario10_Designators(home);
         Scenario11_TranslationsWrittenWhileGameRuns(home);
         Scenario12_ModListTools(home);
+        Scenario13_ReloadsKeepEverythingEnglishAsSource(home);
+        Scenario14_GameGeneratedTextsDoNotDecideTheLanguage(home);
 
         // ---- Crash report + log content
         string crash = CrashReporter.WriteReport("test", new InvalidOperationException("outer", new ArgumentException("inner cause")));
@@ -596,6 +598,78 @@ public static class Harness
         n = Pipeline.SetModeForAll(Pipeline.Mods.FindAll(m => !m.IsSelf), ModMode.Auto);
         Check(n == 1 && Mod("t.moda").Mode == ModMode.Auto && !AutoTranslateMod.Settings.modModes.ContainsKey("t.moda"), "back to automatic: nothing stored for it");
         Check(Pipeline.SettingsChangedSinceStart(), "the change applies when the settings window closes");
+        string allText = Pipeline.DiagnoseAll(Pipeline.Mods.FindAll(m => !m.IsSelf));
+        Check(allText.Contains("SUMMARY") && allText.Contains("t.moda") && allText.Contains("t.modb") && allText.Contains("FULL REPORTS"), "diagnostic of all mods: summary and every report");
+        string saved = Pipeline.SaveDiagnosticFile(allText);
+        Check(File.Exists(saved) && saved.Contains("diagnostics") && File.ReadAllText(saved) == allText, "and it is saved as a .txt in the mod's own folder: " + Path.GetFileName(saved));
+    }
+
+    static void Scenario13_ReloadsKeepEverythingEnglishAsSource(string home)
+    {
+        Console.WriteLine("== scenario 13: reloading (settings window, language change) must never make the game's own translated texts the SOURCE of a new translation");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "rl", "m"), Name = "Reload Mod", PackageIdPlayerFacing = "r.reload" };
+        const string desc = "A workbench equipped with advanced tools to produce components, and it can be built with the materials that you have at hand.";
+        var bench = new ThingDef { defName = "Bench", label = "assembly bench", description = desc };
+        var cab = new ThingDef { defName = "Cab", label = "drug cabinet", description = "Increases work speed when placed near a drug lab. One workbench links up to two drug cabinets." };
+        mod.defs.AddRange(new Def[] { bench, cab });
+        var meta = new ModMetaData { PackageId = "r.reload", Name = "Reload Mod" };
+        meta.ForTest("Vanilla Furniture Expanded - Production module is an ideal mod to fill that late game hole in production, and it adds a whole new layer to the workstations.");
+        mod.ModMetaData = meta;
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };
+        Run("pt");
+        Check(bench.label == "assembly bench (pt)" && cab.label == "drug cabinet (pt)" && bench.description.EndsWith("(pt)"), "first run: names and descriptions translated: " + bench.label + " / " + cab.label);
+        string translatedMeta = meta.Description;
+        Check(translatedMeta.EndsWith("(pt)"), "the mod description is translated too");
+        for (int round = 1; round <= 3; round++)
+        {
+            Pipeline.Reload();
+            WaitWorker(System.Diagnostics.Stopwatch.StartNew());
+            Check(bench.label == "assembly bench (pt)" && cab.label == "drug cabinet (pt)" && cab.description.EndsWith("(pt)"), "after reload " + round + ": still translated, names included: " + bench.label + " / " + cab.label);
+        }
+        string path = Path.Combine(Path.Combine(Paths.CacheDir, Pipeline.Target), "r.reload.json");
+        string json = File.ReadAllText(path);
+        Check(!json.Contains("(pt)\":") , "no translated text was ever used as a source in the cache file");
+        Check(Mod("r.reload").AlreadyTarget == 0, "nothing was taken for 'already in the target language': " + Mod("r.reload").AlreadyTarget);
+        // the window language switch: back to English and again to Portuguese
+        Pipeline.SetSuspended(true);
+        Check(bench.label == "assembly bench" && meta.Description.StartsWith("Vanilla Furniture"), "OFF restores names, descriptions and the mod description");
+        Pipeline.SetSuspended(false);
+    }
+
+    static void Scenario14_GameGeneratedTextsDoNotDecideTheLanguage(string home)
+    {
+        Console.WriteLine("== scenario 14: blueprints, frames and recipes the game generated in Portuguese must not make the whole English mod look Portuguese");
+        AutoTranslateMod.Settings = new AtSettings();
+        var mod = new ModContentPack { RootDir = Path.Combine(home, "gn", "m"), Name = "Generated Mod", PackageIdPlayerFacing = "g.generated" };
+        var cab = new ThingDef { defName = "DrugCab", label = "drug cabinet", description = "Increases work speed when placed near a drug lab. One workbench links up to two drug cabinets." };
+        var butcher = new ThingDef { defName = "Butcher", label = "electric butcher", description = "A motorized table with a rotating saw blade. Consumes a lot of power." };
+        var stone = new ThingDef { defName = "Stone", label = "electric stonecutter's table" };
+        mod.defs.AddRange(new Def[] { cab, butcher, stone });
+        string[] english = {
+            "A refined turret with military-grade stabilization, targeting routines, and hardened casing. Requires steel to refurbish its barrel after heavy use.",
+            "An advanced work table with electrical saws and holders for cutting stone chunks into usable blocks in shorter duration of time on an assembly line.",
+            "A large size manufacturing workbench with several tools for designers and a sewing machine for rapid tailoring of clothes.",
+            "Increases work speed when placed near a tailoring table. One workbench links up to two tailor cabinets.",
+            "A workbench equipped with containers, heaters, and measurement devices for producing various drugs with more efficiency.",
+            "A wood-fueled station for smelting. Extracts usable metal from slag chunks and other mixed metal items.",
+            "A long, narrow ditch dug into the ground. Crossing it requires climbing up and down, therefore it slows down movement speed.",
+            "A powerful, manned artillery cannon designed for long-range bombardment, ideal for precise strikes against enemy structures." };
+        for (int k = 0; k < english.Length; k++)
+            mod.defs.Add(new ThingDef { defName = "Eng" + k, label = "military item " + k, description = english[k] });
+        // what the game makes from every building, in ITS language (Portuguese): lots of it, with the words that give Portuguese away
+        for (int k = 1; k <= 14; k++)
+            mod.defs.Add(new ThingDef { defName = "Frame" + k, generated = true, label = "estrutura " + k + " (construção)",
+                description = "Esta construção ainda não está pronta, por isso não pode ser usada para nada e é preciso terminar o trabalho de construção " + k + "." });
+        LoadedModManager.RunningModsListForReading = new List<ModContentPack> { mod };
+        LanguageDatabase.defaultLanguage = new LoadedLanguage { folderName = "English" };
+        LanguageDatabase.activeLanguage = new LoadedLanguage { folderName = "PortugueseBrazilian" };
+        Run("pt");
+        Check(Mod("g.generated").LatinLang == "en", "the mod is English: its own texts decide, not the generated ones (" + Mod("g.generated").LatinLang + ")");
+        Check(cab.label == "drug cabinet (pt)" && butcher.label == "electric butcher (pt)" && stone.label == "electric stonecutter's table (pt)", "names are translated, short ones included: '" + cab.label + "' / '" + butcher.label + "' / '" + stone.label + "'");
+        Check(cab.description.EndsWith("(pt)") && butcher.description.EndsWith("(pt)"), "descriptions are translated too");
     }
 
     static void Scenario4_CrashMarker(string home)

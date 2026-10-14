@@ -4,6 +4,17 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.010 - 2026-10-14
+- Corrigido: nomes e descrições de itens que ficavam em inglês no jogo mesmo com a tradução pronta no cache (ex.: Electric stonecutter's table, Drug cabinet, Military turret). Causa: textos gerados pelo próprio jogo (plantas de construção/molduras, já no idioma do jogo) faziam o mod achar que o mod traduzido já estava em português e descartar os textos curtos; agora esses textos gerados são ignorados na detecção de idioma do mod.
+- Corrigido: ao recarregar o jogo, o texto original em inglês é mantido como fonte da tradução.
+- Corrigido: receitas geradas pelo jogo não são mais tratadas como texto de mod quando o jogo já está no idioma de destino.
+- Alterado: o marcador de "aplicando traduções" interrompido só desativa um mod de forma permanente na segunda vez seguida; na primeira vale só na sessão.
+- Alterado: na janela de detalhes do mod, as abas agora se chamam "Textos traduzidos", "Palavras traduzidas" e "Não traduzidos pelo mod".
+- Alterado: na tela de opções do jogo, a seção de mods ficou em um cartão separado, com busca e botão "Aplicar a todos (N)..." mais bonitos e botões alinhados; o Diagnóstico fica na mesma linha do botão de modo.
+- Adicionado: botão "Diagnóstico de todos", que copia o diagnóstico de todos os mods e salva um arquivo .txt na pasta de dados do mod (diagnostics), mantendo os últimos 10.
+- Adicionado: diagnóstico de cada mod mostra se o texto em espera já está no arquivo de tradução e não foi aplicado.
+- Adicionado: testes de integração para designadores, aplicação ao vivo do cache, diagnóstico e detecção de idioma com itens gerados.
+
 ## v0.009 - 2026-10-13
 - Alterado: no README, a divisória entre os itens das listas ficou bem curta (12 traços): a versão longa quebrava em quase três linhas no celular.
 - Alterado: no README, os títulos das seções (Compatibilidade, Como funciona, Instalação, Aviso do Windows, Atualizar, Traduzir todos os mods, Opções do mod, O que ele traduz, textos com acentos, Segurança da conexão, Privacidade, Estado atual, Deu problema...) ficam alinhados à esquerda, sem justificar; o texto e as listas continuam justificados e o título principal continua centralizado.
