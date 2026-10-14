@@ -1,36 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ModMetaData>
-  <name>Auto Translate</name>
-  <author>Unknown1210 (code written with Claude, an AI by Anthropic)</author>
+  <name>Auto Translate Mods</name>
+  <author>peraquetocosta</author>
   <packageId>unknown1210.autotranslate</packageId>
   <supportedVersions>
     <li>1.6</li>
   </supportedVersions>
   <description>
-UNDER DEVELOPMENT - made with the help of Claude (an AI by Anthropic). Early version (current version 0.015): expect bugs, and report them.
+UNDER DEVELOPMENT
+
+Made with the help of Claude Code.
+
+Bugs and translation mistakes may exist: please report them.
 
 Automatically translates your OTHER installed mods (names, descriptions and interface texts) into your language, offline and for free. Texts that already have a translation are left alone. AI translation is not 100% perfect, but it is better than a mod that is not in your language.
 
 IMPORTANT: INSTALLING ONLY THIS MOD IS NOT ENOUGH. IT DOES NOT WORK WITHOUT THESE TWO:
-1. Harmony (required mod): https://steamcommunity.com/workshop/filedetails/?id=2009463077
+
+1. Harmony (required mod, subscribe on the Steam Workshop).
+
 2. The translator program UniversalTranslate-Helper.exe (the mod only applies the translations, the program makes them): https://github.com/Unknown1210/rimworld-universal-translate-mods/releases/latest
+
 Then: open the program, choose your language, keep it open while you play (it is only needed while something is being translated), enable Harmony and then Auto Translate.
 
 All the details (how it works, Windows warning, privacy, tips): https://github.com/Unknown1210/rimworld-universal-translate-mods
+
 Settings: Options > Mods > Auto Translate. Found a problem? Report it on GitHub.
 
 ----------------------------------------
 
-EM DESENVOLVIMENTO - feito com a ajuda do Claude (IA da Anthropic). Versão inicial (versão atual 0.015): podem existir erros, avise.
+EM DESENVOLVIMENTO
+
+Feito com a ajuda do Claude Code.
+
+Podem existir erros e bugs de tradução: avise e reporte.
 
 Traduz automaticamente os OUTROS mods que você instalou (nomes, descrições e textos de interface) para o seu idioma, sem internet e de graça. Textos que já têm tradução não são mexidos. A tradução por IA não é 100% perfeita, mas é melhor do que um mod que não está no seu idioma.
 
 IMPORTANTE: INSTALAR SÓ ESTE MOD NÃO BASTA. ELE NÃO FUNCIONA SEM ESTES DOIS:
-1. Harmony (mod obrigatório): https://steamcommunity.com/workshop/filedetails/?id=2009463077
+
+1. Harmony (mod obrigatório, assine na Oficina da Steam).
+
 2. O programa tradutor UniversalTranslate-Helper.exe (o mod só aplica as traduções, o programa é quem as faz): https://github.com/Unknown1210/rimworld-universal-translate-mods/releases/latest
+
 Depois: abra o programa, escolha o seu idioma, deixe-o aberto enquanto joga (só é necessário enquanto algo estiver sendo traduzido), ative Harmony e depois Auto Translate.
 
 Todos os detalhes (como funciona, aviso do Windows, privacidade, dicas): https://github.com/Unknown1210/rimworld-universal-translate-mods
+
 Opções: Opções > Mods > Auto Translate. Achou um problema? Avise no GitHub.
   </description>
   <modDependencies>

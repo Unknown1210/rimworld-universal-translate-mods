@@ -4,6 +4,12 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.016 - 2026-10-14
+- Alterado: descrição do mod no jogo (inglês e português): "EM DESENVOLVIMENTO" em uma linha própria, "Feito com a ajuda do Claude Code", aviso de erros e bugs de tradução para reportar, uma linha em branco entre os blocos, e sem o link do Harmony (a dependência já mostra o botão de assinar); a versão saiu da descrição.
+- Alterado: o mod agora se chama "Auto Translate Mods" e o autor é "peraquetocosta".
+- Alterado: tools/set_version.py não atualiza mais a versão dentro do About.xml, porque ela saiu da descrição.
+- Alterado: capa do mod: a frase de apoio diz que a tradução é automática ("Automatically translates..." e "Traduz seus OUTROS mods para o seu idioma, automaticamente.").
+
 ## v0.015 - 2026-10-14
 - Alterado: capa do mod para a Steam: título "Auto Translate Mods", autor "peraquetocosta", requisitos (Harmony, Auto Translate Mods e Helper .exe) e a mensagem "Baixe no GitHub" centralizada no quadro do programa.
 
