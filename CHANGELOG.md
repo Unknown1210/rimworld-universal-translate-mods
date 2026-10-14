@@ -4,6 +4,10 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.017 - 2026-10-14
+- Alterado: capa do mod: faixa diagonal "Leia a descrição / Read the description" com "Instalação e downloads no GitHub", e a palavra "offline" saiu (a frase agora diz só que traduz automaticamente).
+- Corrigido: README (português e inglês) e descrição do mod no jogo diziam que funciona "sem internet"/"offline"; agora dizem que a tradução é no seu computador, de graça, e que não precisa de internet depois de baixar o modelo do idioma uma vez.
+
 ## v0.016 - 2026-10-14
 - Alterado: descrição do mod no jogo (inglês e português): "EM DESENVOLVIMENTO" em uma linha própria, "Feito com a ajuda do Claude Code", aviso de erros e bugs de tradução para reportar, uma linha em branco entre os blocos, e sem o link do Harmony (a dependência já mostra o botão de assinar); a versão saiu da descrição.
 - Alterado: o mod agora se chama "Auto Translate Mods" e o autor é "peraquetocosta".
