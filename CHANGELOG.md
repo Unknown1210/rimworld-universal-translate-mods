@@ -4,6 +4,15 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.022 - 2026-10-15
+- Alterado: a aba "Traduzir mods" do executável passa a acompanhar o que o jogo traduz sozinho: a linha de cada mod mostra o idioma de origem, os textos e as palavras já traduzidos e o estado ("Traduzindo pelo jogo..." e depois "Traduzido pelo jogo"), e o resumo soma tudo; mods traduzidos pelo jogo em outra sessão aparecem com os números do arquivo de tradução salvo.
+- Alterado: o botão "Traduzir pendentes" ficou verde (cinza quando não há nada a fazer) para se destacar; os botões "Abrir pasta de dados" e "Abrir pasta do mod" ficaram só na aba Início.
+- Alterado: a aba Início foi reformulada com duas opções lado a lado: jogar com o programa aberto (ele traduz sozinho) ou traduzir tudo agora pela aba Traduzir mods (mais rápido), com um botão para ir até ela; o aviso de reiniciar o jogo ficou embaixo.
+- Adicionado: tradução em segundo plano de todos os mods, mesmo os desativados no jogo: com o programa aberto, depois que o jogo fica 30 segundos sem pedir tradução, ele traduz os mods que faltam, esperando entre um lote e outro enquanto o jogo estiver pedindo (os mods do jogo vão primeiro). Há uma caixa na aba Início para desligar; o botão Parar pausa por 10 minutos.
+- Alterado: "Idioma de destino da tradução" e "Escolha o idioma de destino para traduzir os mods."
+- Alterado: ao procurar atualização, as notas da versão não aparecem mais embaixo do número; entrou o botão "Ver changelog", que abre o CHANGELOG.md no GitHub.
+- Adicionado: testes novos para a tabela que acompanha o jogo, a tradução em segundo plano, o botão de changelog e os botões de pasta.
+
 ## v0.021 - 2026-10-14
 - Alterado: os READMEs foram reorganizados: o texto em português passou a ser README.br.md, o inglês continua README.en.md e o README.md virou uma página de entrada curta e bilíngue, com os botões de idioma, a versão atual e os links de licença, créditos e changelog.
 - Alterado: tools/set_version.py passou a atualizar a versão nos três READMEs.

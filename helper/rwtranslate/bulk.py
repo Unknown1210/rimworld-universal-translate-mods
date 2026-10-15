@@ -371,11 +371,22 @@ def plan(target, dirs=None):
 
 # ---------------------------------------------------------------- translating
 
+_polite = False                  # background run: let the game's own requests go first (see run(polite=True))
+POLITE_QUIET_S = 3.0             # how long the game must be quiet before the next batch of a polite run
+
+
+def _wait_for_game(cancel):
+    """Polite runs only: while the game is asking for translations, wait (the game's mods come first)."""
+    while _polite and server.seconds_since_game_request() < POLITE_QUIET_S and not (cancel and cancel.is_set()):
+        time.sleep(0.4)
+
+
 def _translate_group(src, target, texts, result, cancel, on_batch):
     """Translate texts of one source language; returns {text: translation}. Never raises."""
     out = {}
     i = 0
     while i < len(texts) and not (cancel and cancel.is_set()):
+        _wait_for_game(cancel)
         batch, chars = [], 0
         while i < len(texts) and len(batch) < BATCH_MAX and chars < BATCH_CHARS:
             batch.append(texts[i])
@@ -476,8 +487,9 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
 FLAG_NAME = "bulk-running.flag"
 
 
-def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True):
+def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True, polite=False):
     """Translate pending (new/changed) mods, or all with force=True. Returns the list of ModResult.
+    polite=True is the background run: between batches it waits while the game is asking for translations (the active mods first).
     While it runs, a small flag file (<data>/bulk-running.flag) is touched every 2 seconds: the game, if it is open, only looks at the
     translations files while that flag is fresh (and once more when it goes away), so it does not have to keep checking."""
     flag = data_dir() / FLAG_NAME
@@ -492,9 +504,12 @@ def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending
             stop.wait(2.0)
     t = threading.Thread(target=beat, daemon=True, name="bulk-flag")
     t.start()
+    global _polite
+    _polite = polite
     try:
         return _run(target, dirs, force, progress, cancel, only_pending)
     finally:
+        _polite = False
         stop.set()
         t.join(timeout=3)
         try:

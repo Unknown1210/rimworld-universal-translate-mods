@@ -10,12 +10,12 @@
 
 <div align="justify">
 
-**Current version: 0.021** · [Download from the Releases tab](../../releases/latest)
+**Current version: 0.022** · [Download from the Releases tab](../../releases/latest)
 
 Translates the other mods in your game into your language **automatically**, **without needing a translation mod for each mod**.
 The translation runs **on your computer and for free**. After the model for your language is downloaded once, **no internet is needed**. Every translation is saved, so it is only done once.
 
-> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.021). See "Current status" below.
+> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.022). See "Current status" below.
 
 <h2 align="left">Compatibility</h2>
 
@@ -124,7 +124,7 @@ With RimWorld's **developer mode** on, the game itself marks the texts that have
 
 <h2 align="left">Current status (transparency)</h2>
 
-This is an **early version** (current version 0.021), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
+This is an **early version** (current version 0.022), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
 
 <h2 align="left">Problem or conflict with a mod?</h2>
 

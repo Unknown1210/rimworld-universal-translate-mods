@@ -203,6 +203,74 @@ class Window(unittest.TestCase):
         app.set_lang("fr")                                      # not translated yet (no model in tests): English until it is ready
         self.assertEqual(str(app.btn_quit.cget("text")), "Quit")
 
+    def test_background_translation_of_all_mods_waits_for_the_game_and_can_be_switched_off(self):
+        import time
+        from unittest import mock
+        from rwtranslate import config, models, server
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        mod = type("M", (), {"package_id": "x.mod", "name": "X"})()
+        app.plan_rows = [(mod, "new", None)]
+        config.set("target", "pt-BR")
+        app.set_lang_choices(["pt-BR", "en"])
+        with mock.patch.object(models, "is_installed", return_value=True):
+            server.LAST_GAME_REQUEST = 0.0
+            self.assertTrue(app.should_auto_bulk(), "pending mods, model there, the game is quiet: translate them (even the disabled ones)")
+            server.LAST_GAME_REQUEST = time.time()
+            self.assertFalse(app.should_auto_bulk(), "the game is asking right now: its mods come first")
+            server.LAST_GAME_REQUEST = 0.0
+            app.plan_rows = [(mod, "ok", {})]
+            self.assertFalse(app.should_auto_bulk(), "nothing left to translate")
+            app.plan_rows = [(mod, "new", None)]
+            app._auto_pause_until = time.time() + 60                    # the player pressed Stop
+            self.assertFalse(app.should_auto_bulk())
+            app._auto_pause_until = 0
+            config.set("background_all", False)
+            self.assertFalse(app.should_auto_bulk(), "switched off in the window")
+            config.set("background_all", True)
+            with mock.patch.object(app, "start_bulk") as sb:
+                app.auto_bulk_tick()
+            sb.assert_called_once_with(False, polite=True)
+        self.assertTrue(app.chk_bg.instate(["selected"]))
+        app.chk_bg.state(["!selected"])
+        app.on_bg_toggle()
+        self.assertFalse(app.bg_enabled())
+        config.set("background_all", True)
+
+    def test_polite_run_waits_while_the_game_is_asking(self):
+        import time
+        from rwtranslate import bulk, server
+        old = bulk.POLITE_QUIET_S
+        try:
+            bulk.POLITE_QUIET_S = 0.3
+            bulk._polite = True
+            server.LAST_GAME_REQUEST = time.time()
+            t0 = time.time()
+            bulk._wait_for_game(None)
+            self.assertGreaterEqual(time.time() - t0, 0.25, "waited for the game to go quiet")
+            t0 = time.time()
+            bulk._wait_for_game(None)
+            self.assertLess(time.time() - t0, 0.2, "no wait when the game is quiet")
+            bulk._polite = False
+            server.LAST_GAME_REQUEST = time.time()
+            t0 = time.time()
+            bulk._wait_for_game(None)
+            self.assertLess(time.time() - t0, 0.2, "a run started by the player never waits")
+        finally:
+            bulk.POLITE_QUIET_S = old
+            bulk._polite = False
+            server.LAST_GAME_REQUEST = 0.0
+
+    def test_changelog_button_opens_github_and_the_update_message_has_no_notes(self):
+        from unittest import mock
+        from rwtranslate import gui
+        app = self.build(fake_fetcher(release_json("v9.0")))
+        self.assertTrue(pump(self.root, lambda: "Nova versão disponível: v9.0" in app.update_msg.get()), app.update_msg.get())
+        self.assertNotIn("\n", app.update_msg.get().strip(), "only the version line: the notes are on GitHub")
+        self.assertEqual(str(app.btn_changelog.cget("text")), "Ver changelog")
+        with mock.patch.object(gui.webbrowser, "open") as op:
+            app.btn_changelog.invoke()
+        op.assert_called_once_with("https://github.com/Unknown1210/rimworld-universal-translate-mods/blob/main/CHANGELOG.md")
+
     def test_github_button_opens_the_repository(self):
         from unittest import mock
         from rwtranslate import gui
@@ -263,17 +331,13 @@ class Window(unittest.TestCase):
         (other / "About" / "About.xml").write_text("<ModMetaData><packageId>someone.else</packageId></ModMetaData>")
         app = self.build(fake_fetcher(release_json("v0.0")), mod_dirs=[str(mods)])
         self.assertEqual(str(app.btn_data.cget("text")), "Abrir pasta de dados")
-        self.assertEqual(str(app.btn_modfolder2.cget("text")), "Abrir pasta do mod")
+        self.assertFalse(hasattr(app, "btn_data2"))                                      # the folder buttons are on the Home tab only
         self.assertFalse(hasattr(app, "btn_logs"))                                      # the logs button of the Home tab was replaced
         with mock.patch.object(gui, "open_folder") as op:
             app.btn_data.invoke()
-            app.btn_data2.invoke()
             self.assertEqual(op.call_args_list[0][0][0], gui.data_dir())
-            self.assertEqual(op.call_args_list[1][0][0], gui.data_dir())
             app.btn_modfolder.invoke()                                                    # found in the Workshop-like folder
-            self.assertEqual(Path(op.call_args_list[2][0][0]), ours)
-            app.btn_modfolder2.invoke()
-            self.assertEqual(Path(op.call_args_list[3][0][0]), ours)
+            self.assertEqual(Path(op.call_args_list[1][0][0]), ours)
         app.mod_dirs_override = []
         with mock.patch("tkinter.messagebox.showinfo") as info, mock.patch.object(gui, "open_folder") as op:
             app.btn_modfolder.invoke()
@@ -286,11 +350,11 @@ class Window(unittest.TestCase):
 
     def test_layout_is_responsive(self):
         app = self.build(fake_fetcher(release_json("v0.0")))
-        self.root.geometry("820x500")
+        self.root.geometry("900x500")                             # (the window can not be narrower than its widgets need)
         pump(self.root, lambda: False, timeout=0.3)
         small = int(str(app.update_msg.label.cget("wraplength")))
         small_btn = app.btn_check.winfo_width()
-        self.root.geometry("960x500")
+        self.root.geometry("1100x500")
         pump(self.root, lambda: False, timeout=0.5)
         big = int(str(app.update_msg.label.cget("wraplength")))
         self.assertGreater(big, small + 80, "text re-wraps to the new width")
@@ -379,6 +443,47 @@ class BulkTab(unittest.TestCase):
         (m / "About" / "About.xml").write_text(f"<ModMetaData><name>{name}</name><packageId>{pid}</packageId></ModMetaData>", encoding="utf-8")
         (m / "Defs").mkdir()
         (m / "Defs" / "t.xml").write_text(f"<Defs>{defs}</Defs>", encoding="utf-8")
+
+    def test_game_translations_show_up_in_the_mods_table(self):
+        """The game translates by itself (the mod asks this program, saves the result in the cache): the table must follow."""
+        from rwtranslate import activity, bulk, config, gui, server
+        config.set("target", "pt-BR")
+        root = Path(tempfile.mkdtemp())
+        self.mod(root, "A", "a.mod", "Alpha Mod", "<ThingDef><defName>X</defName><label>iron sword</label><description>A sharp sword for fighting.</description></ThingDef>")
+        httpd = server.serve(0)
+        threading.Thread(target=httpd.serve_forever, daemon=True).start()
+        r = tkinter.Tk()
+        try:
+            app = gui.App(r, httpd, fetcher=fake_fetcher(release_json("v0.0")), lang="pt", mod_dirs=[root])
+            self.assertTrue(pump(r, lambda: len(app.plan_rows) == 1), "scan lists the mod")
+            iid = app.rows["a.mod"]
+            self.assertEqual(str(app.tree.item(iid, "values")[2]), "0")                       # nothing translated yet: zeroed, as before
+            self.assertEqual(str(app.tree.item(iid, "values")[4]), "Novo (não traduzido)")
+            bulk.write_cache("pt-BR", "a.mod", {"iron sword": "espada de ferro", "A sharp sword for fighting.": "Uma espada afiada para lutar."})
+            activity.emit("game", "log_game_batch", {"n": 2, "src": "en", "tgt": "pt-BR", "mod": "A.Mod", "chars": 38, "ms": 5, "first": ""},
+                          pairs=[("iron sword", "espada de ferro"), ("A sharp sword for fighting.", "Uma espada afiada para lutar.")])
+            self.assertTrue(pump(r, lambda: "jogo" in str(app.tree.item(iid, "values")[4])), "the row follows the game")
+            vals = [str(v) for v in app.tree.item(iid, "values")]
+            self.assertEqual((vals[1], vals[2], vals[3]), ("en", "2", "7"))                    # source language, texts, words (2 + 5)
+            self.assertEqual(vals[4], "Traduzindo pelo jogo...")
+            self.assertIn("Palavras traduzidas: 7", app.bulk_summary.get())                                 # the summary line adds it up too
+            app.game_live[("pt-BR", "a.mod")]["last"] -= 100                                    # the game goes quiet
+            app.refresh_live_rows()
+            self.assertEqual(str(app.tree.item(iid, "values")[4]), "Traduzido pelo jogo")
+            # a mod translated by the game in an earlier run (nothing live): the numbers come from its saved translations
+            app.game_live.clear()
+            app.render_rows()
+            vals = [str(v) for v in app.tree.item(app.rows["a.mod"], "values")]
+            self.assertEqual((vals[2], vals[3], vals[4]), ("2", "7", "Traduzido pelo jogo"))
+            # and the details window shows what was translated
+            top = app.show_details("a.mod")
+            tv = top.details["translated"]
+            self.assertEqual(len(tv.get_children()), 2)
+            top.destroy()
+        finally:
+            bulk.cache_path("pt-BR", "a.mod").unlink(missing_ok=True)                            # the next test uses a mod with the same id
+            httpd.shutdown()
+            r.destroy()
 
     def test_search_translate_find_new_and_summary(self):
         from rwtranslate import bulk, config, gui, server

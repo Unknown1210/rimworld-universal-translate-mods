@@ -18,7 +18,9 @@ from . import __version__, activity, bulk, config, diagnostics, i18n, languages,
 from .paths import data_dir, logs_dir
 
 log = logsetup.get("gui")
+ACCENT, ACCENT_DARK, ACCENT_OFF = "#2e7d32", "#1b5e20", "#9aa5a0"          # the "Translate pending" button: green; grey when there is nothing to do
 REPO_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods"
+CHANGELOG_URL = REPO_URL + "/blob/main/CHANGELOG.md"
 ISSUES_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods/issues/new?labels=bug"
 def ui_name(code):
     """Window language as the picker shows it: its own name only ("Deutsch"), short enough never to be cut off."""
@@ -228,6 +230,9 @@ class App:
         self.restart_fn = restart or self._restart
         self.lang = lang or i18n.current()
         self.repaired = set()
+        self.game_live = {}              # (target, package id) -> what the GAME asked this program to translate: texts, words, languages, last time
+        self._live_job = None
+        self._cache_stats = {}           # (target, package id) -> (mtime, texts, words) of the mod's saved translations
         self.ui_job = None                                 # language whose window texts are being prepared (translated) in the background
         self.q = queue.Queue()
         self.latest = None
@@ -283,6 +288,8 @@ class App:
         self.render_log()
         self.start_check()
         self.refresh_plan()
+        self._last_scan = time.time()
+        self._auto_job = self.root.after(self.BG_TICK_MS, self.auto_bulk_tick)
         self.prepare_ui_texts()
 
     # ------------------------------------------------------------------ construction
@@ -312,22 +319,9 @@ class App:
         content.grid(row=1, column=0, sticky="ew")
         content.columnconfigure(0, weight=1)
         self.content = content
-        keep_box = ttk.Frame(content)
-        keep_box.grid(row=0, column=0, sticky="ew", pady=(0, 6))
-        keep_box.columnconfigure(0, weight=1)
-        self.lbl_keep = selectable_label_class()(keep_box, font=("TkDefaultFont", 11, "bold"), anchor="center", justify="center")
-        self.lbl_keep.grid(row=0, column=0, sticky="ew")
-        self.lbl_keep2 = selectable_label_class()(keep_box, foreground="#555555", anchor="center", justify="center")      # when it can be closed
-        self.lbl_keep2.grid(row=1, column=0, sticky="ew", pady=(2, 0))
-        self.lbl_keep3 = selectable_label_class()(keep_box, foreground="#8a5a00", anchor="center", justify="center")      # texts only the running game can ask for
-        self.lbl_keep3.grid(row=2, column=0, sticky="ew", pady=(4, 0))
-        self.lbl_keep4 = selectable_label_class()(keep_box, foreground="#555555", anchor="center", justify="center")      # restart if the game does not show new translations
-        self.lbl_keep4.grid(row=3, column=0, sticky="ew", pady=(4, 0))
-        ttk.Frame(content, height=6).grid(row=2, column=0)
-
-        # target language: the single place to choose it; the game mod reads config.json
+        # target language first: the single place to choose it; the game mod reads config.json
         row = ttk.Frame(content)
-        row.grid(row=3, column=0, pady=(0, 2))
+        row.grid(row=0, column=0, pady=(0, 2))
         self.lbl_target = selectable_label_class()(row, autowidth=True, anchor="w", justify="left")
         self.lbl_target.grid(row=0, column=0, padx=(0, 6))
         self.lang_box = ttk.Combobox(row, width=30, state="readonly")
@@ -335,7 +329,45 @@ class App:
         self.lang_box.bind("<<ComboboxSelected>>", self.on_target_selected)
         self.btn_model = ttk.Button(row, command=self.install_model)
         self.btn_model.grid(row=0, column=2)
-        self.target_msg = self.field(content, 4, pady=(0, 6), color="#2a7a2a")
+        self.target_msg = self.field(content, 1, pady=(0, 8), color="#2a7a2a")
+        # the two ways to get the translations, side by side: play with this program open (it translates by itself),
+        # or translate everything now from the "Translate mods" tab (faster)
+        cards = ttk.Frame(content)
+        cards.grid(row=2, column=0, sticky="ew")
+        cards.columnconfigure(0, weight=1, uniform="card")
+        cards.columnconfigure(2, weight=1, uniform="card")
+        Sel = selectable_label_class()
+        self.card1 = ttk.LabelFrame(cards, padding=10)
+        self.card1.grid(row=0, column=0, sticky="nsew")
+        self.card1.columnconfigure(0, weight=1)
+        self.lbl_opt1_body = Sel(self.card1, anchor="w", justify="left")
+        self.lbl_opt1_body.grid(row=0, column=0, sticky="ew")
+        self.lbl_opt1_note = Sel(self.card1, foreground="#555555", anchor="w", justify="left")
+        self.lbl_opt1_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        self.lbl_or = ttk.Label(cards, font=("TkDefaultFont", 11, "bold"), foreground="#777777")
+        self.lbl_or.grid(row=0, column=1, padx=10)
+        self.card2 = ttk.LabelFrame(cards, padding=10)
+        self.card2.grid(row=0, column=2, sticky="nsew")
+        self.card2.columnconfigure(0, weight=1)
+        self.lbl_opt2_body = Sel(self.card2, anchor="w", justify="left")
+        self.lbl_opt2_body.grid(row=0, column=0, sticky="ew")
+        self.lbl_opt2_note = Sel(self.card2, foreground="#555555", anchor="w", justify="left")
+        self.lbl_opt2_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
+        self.btn_go_bulk = self.tk.Button(self.card2, command=lambda: self.nb.select(self.bulk_tab), bg=ACCENT, fg="white",
+                                          activebackground=ACCENT_DARK, activeforeground="white", relief="flat", bd=0, padx=10, pady=6,
+                                          cursor="hand2", font=("TkDefaultFont", 10, "bold"))
+        self.btn_go_bulk.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        self.lbl_restart = Sel(content, foreground="#8a5a00", anchor="center", justify="center")        # restart if the game does not show new translations
+        self.lbl_restart.grid(row=3, column=0, sticky="ew", pady=(8, 0))
+        # also translate the mods that are not enabled in the game, in the background (the ones the game asks for come first)
+        bg_box = ttk.Frame(content)
+        bg_box.grid(row=4, column=0, sticky="ew", pady=(8, 6))
+        bg_box.columnconfigure(0, weight=1)
+        self.chk_bg = ttk.Checkbutton(bg_box, command=self.on_bg_toggle)
+        self.chk_bg.grid(row=0, column=0)
+        self.chk_bg.state(["selected"] if self.bg_enabled() else ["!selected"])
+        self.lbl_bg_note = Sel(bg_box, foreground="#555555", anchor="center", justify="center")
+        self.lbl_bg_note.grid(row=1, column=0, sticky="ew")
         self.set_lang_choices(SUPPORTED_TARGETS)
 
         ttk.Separator(content).grid(row=5, column=0, sticky="ew", pady=8)
@@ -345,7 +377,8 @@ class App:
         row1.grid(row=8, column=0, sticky="ew", pady=3)
         self.btn_check = ttk.Button(row1, command=self.start_check)
         self.btn_apply = ttk.Button(row1, command=self.start_update, state="disabled")
-        self.stretch(row1, [self.btn_check, self.btn_apply])
+        self.btn_changelog = ttk.Button(row1, command=lambda: webbrowser.open(CHANGELOG_URL))     # the list of changes is on GitHub, not in the window
+        self.stretch(row1, [self.btn_check, self.btn_apply, self.btn_changelog])
         row2 = ttk.Frame(content)
         row2.grid(row=9, column=0, sticky="ew", pady=3)
         self.btn_data = ttk.Button(row2, command=self.open_data_folder)
@@ -365,19 +398,14 @@ class App:
         self.dirs_frame.columnconfigure(0, weight=1)
         self.dir_labels = []                    # [(path label, tag label or None)] of the rows drawn by render_dirs
         self.dir_rows = []
-        outer = ttk.Frame(b)
-        outer.grid(row=2, column=0, sticky="ew", pady=3)
-        outer.columnconfigure(0, weight=1)
-        btns = ttk.Frame(outer)
-        btns.grid(row=0, column=0, sticky="ew")
-        btns2 = ttk.Frame(outer)                                  # the same two folder buttons as on the Home tab
-        btns2.grid(row=1, column=0, sticky="ew", pady=(3, 0))
-        self.btn_data2 = ttk.Button(btns2, command=self.open_data_folder)
-        self.btn_modfolder2 = ttk.Button(btns2, command=self.open_mod_folder)
-        self.stretch(btns2, [self.btn_data2, self.btn_modfolder2], uniform=False)
+        btns = ttk.Frame(b)
+        btns.grid(row=2, column=0, sticky="ew", pady=3)
         self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
         self.btn_scan = ttk.Button(btns, command=self.refresh_plan)
-        self.btn_bulk = ttk.Button(btns, command=lambda: self.start_bulk(False), state="disabled")
+        # the main action stands out: a coloured button (a plain tk.Button, because the native ttk buttons of Windows ignore colours)
+        self.btn_bulk = self.tk.Button(btns, command=lambda: self.start_bulk(False), state="disabled", bg=ACCENT_OFF, fg="white",
+                                       activebackground=ACCENT_DARK, activeforeground="white", disabledforeground="#eeeeee",
+                                       relief="flat", bd=0, padx=10, pady=5, cursor="hand2", font=("TkDefaultFont", 10, "bold"))
         self.btn_bulk_all = ttk.Button(btns, command=lambda: self.start_bulk(True))
         self.btn_stop = ttk.Button(btns, command=self.stop_bulk, state="disabled")
         self.btn_clear = ttk.Button(btns, command=self.clear_translations)
@@ -509,6 +537,8 @@ class App:
     def on_log_entry(self, e):
         """An entry arrived from any thread: keep it, and show it if the filter allows (follow the end only if already at the end)."""
         self.log_entries.append(e)
+        if e.kind == "game" and e.key == "log_game_batch":
+            self.note_game_batch(e)
         if len(self.log_entries) > activity.MAX_ENTRIES:
             del self.log_entries[: len(self.log_entries) - activity.MAX_ENTRIES]
         if self.log_passes(e):
@@ -574,10 +604,6 @@ class App:
         wrap = max(200, event.width - 90)
         for f in self.fields:
             f.label.configure(wraplength=wrap)
-        self.lbl_keep.configure(wraplength=wrap)
-        self.lbl_keep2.configure(wraplength=wrap)
-        self.lbl_keep3.configure(wraplength=wrap)
-        self.lbl_keep4.configure(wraplength=wrap)
         for path_lbl, _tag in self.dir_labels:
             path_lbl.configure(wraplength=max(150, wrap - 140))
 
@@ -593,19 +619,25 @@ class App:
         self.nb.tab(self.home, text=t("tab_home"))
         self.nb.tab(self.bulk_tab, text=t("tab_bulk"))
         self.nb.tab(self.log_tab, text=t("tab_log"))
-        self.lbl_keep.configure(text=t("keep_open"))
-        self.lbl_keep2.configure(text=t("keep_open2"))
-        self.lbl_keep3.configure(text=t("keep_open3"))
-        self.lbl_keep4.configure(text=t("keep_open4"))
+        self.card1.configure(text=t("opt1_title"))
+        self.card2.configure(text=t("opt2_title"))
+        self.lbl_opt1_body.configure(text=t("opt1_body"))
+        self.lbl_opt1_note.configure(text=t("opt1_note"))
+        self.lbl_opt2_body.configure(text=t("opt2_body"))
+        self.lbl_opt2_note.configure(text=t("opt2_note"))
+        self.btn_go_bulk.configure(text=t("opt2_btn"))
+        self.lbl_or.configure(text=t("opt_or"))
+        self.lbl_restart.configure(text=t("restart_note"))
+        self.chk_bg.configure(text=t("bg_all"))
+        self.lbl_bg_note.configure(text=t("bg_note"))
         self.lbl_ui.configure(text=t("ui_lang"))
         self.lbl_target.configure(text=t("target_lang"))
         self.btn_model.configure(text=t("download_model"))
         self.btn_check.configure(text=t("check_btn"))
         self.btn_apply.configure(text=t("apply_btn"))
+        self.btn_changelog.configure(text=t("changelog_btn"))
         self.btn_data.configure(text=t("data_folder_btn"))
         self.btn_modfolder.configure(text=t("mod_folder_btn"))
-        self.btn_data2.configure(text=t("data_folder_btn"))
-        self.btn_modfolder2.configure(text=t("mod_folder_btn"))
         self.btn_report.configure(text=t("report_btn"))
         self.btn_github.configure(text=t("github_btn"))
         self.btn_quit.configure(text=t("quit_btn"))
@@ -797,15 +829,10 @@ class App:
             self.update_msg.set(chk.error)
         elif chk.available:
             self.latest = chk.release
-            self.update_msg.set(self.t("new_version", latest=chk.latest, current=chk.current) + "\n" + self._short(chk.notes))
+            self.update_msg.set(self.t("new_version", latest=chk.latest, current=chk.current))
             self.btn_apply.configure(state="normal")
         else:
             self.update_msg.set_key("up_to_date", current=chk.current)
-
-    @staticmethod
-    def _short(notes, n=300):
-        notes = (notes or "").strip().split("### Como instalar")[0].strip()
-        return notes if len(notes) <= n else notes[:n] + "..."
 
     def start_update(self):
         if self.busy or self.latest is None:
@@ -965,7 +992,8 @@ class App:
         pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
         self.btn_bulk.configure(text=self.t("bulk_start_pending", n=pend))
         idle = not self.bulk_running
-        self.btn_bulk.configure(state="normal" if idle and pend > 0 and self.selected_target() else "disabled")
+        can_run = idle and pend > 0 and bool(self.selected_target())
+        self.btn_bulk.configure(state="normal" if can_run else "disabled", bg=ACCENT if can_run else ACCENT_OFF)
         self.btn_bulk_all.configure(state="normal" if idle and self.plan_rows and self.selected_target() else "disabled")
         self.btn_scan.configure(state="normal" if idle else "disabled")
         self.btn_add_dir.configure(state="normal" if idle else "disabled")
@@ -1018,6 +1046,10 @@ class App:
             state = t("st_ok")
         texts = words = 0
         src = ""
+        game = None if saved else self.game_stats(mod.package_id)
+        if game:                                          # never translated by the "Translate mods" tab, but the game has been asking
+            texts, words, src, recent = game
+            state = t("st_game_running") if recent else t("st_game_done")
         if saved:
             texts, words = saved.get("texts", 0), saved.get("words", 0)
             src = ", ".join(sorted(saved.get("langs", {})))
@@ -1026,6 +1058,87 @@ class App:
             elif saved.get("failed"):
                 state += " - " + t("st_failed", n=saved["failed"])
         return (mod.name, src, texts, words, state)
+
+    GAME_RECENT_S = 25           # a mod the game asked for in the last seconds is "being translated by the game"
+
+    def game_stats(self, package_id):
+        """(texts, words, source languages, recent) of a mod translated through the game, or None. The numbers come from the mod's saved
+        translations (what really is translated), and the live counters add what arrived since the game last saved them."""
+        tgt = self.selected_target()
+        if not tgt:
+            return None
+        live = self.game_live.get((tgt, package_id.lower()))
+        saved_texts = saved_words = 0
+        f = bulk.cache_path(tgt, package_id)
+        try:
+            mt = f.stat().st_mtime
+        except OSError:
+            mt = None
+        if mt is not None:
+            cached = self._cache_stats.get((tgt, package_id))
+            if cached is None or cached[0] != mt:
+                entries = bulk.read_cache(tgt, package_id)
+                cached = (mt, len(entries), sum(bulk.count_words(k) for k in entries))
+                self._cache_stats[(tgt, package_id)] = cached
+            saved_texts, saved_words = cached[1], cached[2]
+        if live is None and not saved_texts:
+            return None
+        texts, words = saved_texts, saved_words
+        recent = False
+        src = ""
+        if live:
+            texts, words = max(texts, live["texts"]), max(words, live["words"])
+            src = ", ".join(sorted(live["src"]))
+            recent = time.time() - live["last"] < self.GAME_RECENT_S
+        return texts, words, src, recent
+
+    def note_game_batch(self, e):
+        """The game asked for a translation: remember it and refresh that mod's row in the "Translate mods" table."""
+        a = e.args
+        tgt, pid = a.get("tgt"), a.get("mod")
+        if not tgt or not pid or pid == "?":
+            return
+        live = self.game_live.setdefault((tgt, pid.lower()), {"texts": 0, "words": 0, "src": set(), "last": 0.0})
+        live["texts"] += int(a.get("n", 0))
+        live["words"] += sum(bulk.count_words(orig) for orig, _tr in e.pairs)
+        if a.get("src"):
+            live["src"].add(str(a["src"]))
+        live["last"] = e.when
+        if self._live_job is None:
+            self._live_job = self.root.after(500, self.refresh_live_rows)
+
+    def refresh_live_rows(self):
+        """Update the rows of the mods the game is translating (and the summary line) without redrawing the whole table."""
+        self._live_job = None
+        if self.bulk_running or not self.plan_rows:
+            return
+        again = False
+        tgt = self.selected_target()
+        for mod, status, saved in self.plan_rows:
+            if saved is not None:
+                continue
+            iid = self.rows.get(mod.package_id)
+            if iid is None:
+                continue
+            self.tree.item(iid, values=self._with_folder(self._row_values(mod, status, saved)))
+            live = self.game_live.get((tgt, mod.package_id.lower()))
+            if live and time.time() - live["last"] < self.GAME_RECENT_S:
+                again = True                               # come back to flip "translating" into "translated" when the game goes quiet
+        self.update_summary()
+        if again:
+            self._live_job = self.root.after(3000, self.refresh_live_rows)
+
+    def update_summary(self):
+        texts = words = 0
+        for iid in self.tree.get_children():
+            vals = self.tree.item(iid, "values")
+            try:
+                texts += int(vals[2])
+                words += int(vals[3])
+            except (ValueError, IndexError):
+                pass
+        pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
+        self.bulk_summary.set_key("bulk_summary", mods=len(self.plan_rows), pending=pend, texts=texts, words=words)
 
     def render_rows(self):
         self.tree.delete(*self.tree.get_children())
@@ -1042,7 +1155,46 @@ class App:
         pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
         self.bulk_summary.set_key("bulk_summary", mods=len(self.plan_rows), pending=pend, texts=texts, words=words)
 
-    def start_bulk(self, force):
+    # ------------------------------------------------------------------ background translation of ALL mods
+    BG_TICK_MS = 20000           # how often the program looks whether it is time to translate the rest in the background
+    BG_QUIET_S = 30              # the game must have been quiet this long (the mods it uses are done) before the others start
+    BG_RESCAN_S = 600            # look for new mods in the folders every 10 minutes
+    BG_PAUSE_S = 600             # after the user presses Stop, the background run waits this long
+
+    def bg_enabled(self):
+        v = config.get("background_all")
+        return True if v is None else bool(v)
+
+    def on_bg_toggle(self):
+        config.set("background_all", bool(self.chk_bg.instate(["selected"])))
+
+    def should_auto_bulk(self):
+        """True when the translations of the not-yet-translated mods (even disabled ones) can start now, in the background."""
+        if not self.bg_enabled() or self.bulk_running:
+            return False
+        tgt = self.selected_target()
+        if not tgt or not (tgt == "en" or models.is_installed("en", tgt)):
+            return False
+        if time.time() < getattr(self, "_auto_pause_until", 0):
+            return False
+        if server.seconds_since_game_request() < self.BG_QUIET_S:
+            return False                                                   # the game is still asking: its mods come first
+        return any(s != "ok" for _m, s, _r in self.plan_rows)
+
+    def auto_bulk_tick(self):
+        try:
+            if not self.bulk_running and self.selected_target():
+                if not self.plan_rows or time.time() - getattr(self, "_last_scan", 0) > self.BG_RESCAN_S:
+                    self._last_scan = time.time()
+                    self.refresh_plan()                                    # (the next tick decides, with fresh data)
+                elif self.should_auto_bulk():
+                    activity.emit("bulk", "log_bulk_auto", {})
+                    self.start_bulk(False, polite=True)
+        except Exception:  # noqa: BLE001
+            log.exception("background translation check failed")
+        self._auto_job = self.root.after(self.BG_TICK_MS, self.auto_bulk_tick)
+
+    def start_bulk(self, force, polite=False):
         tgt = self.selected_target()
         if not tgt:
             self.bulk_summary.set_key("bulk_need_target")
@@ -1056,12 +1208,13 @@ class App:
         cancel, dirs = self.cancel, self.dirs()
 
         def work():
-            return bulk.run(tgt, dirs, force=force, cancel=cancel,
+            return bulk.run(tgt, dirs, force=force, cancel=cancel, polite=polite,
                             progress=lambda e: self.post(lambda e=e: self.on_bulk_event(e)))
 
         self.run_bg(work, self._bulk_done)
 
     def stop_bulk(self):
+        self._auto_pause_until = time.time() + self.BG_PAUSE_S             # the player stopped it: no automatic restart for a while
         if self.cancel is not None:
             self.cancel.set()
 

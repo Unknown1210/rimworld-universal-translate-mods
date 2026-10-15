@@ -38,6 +38,13 @@ def load_or_create_token():
     return t
 
 
+LAST_GAME_REQUEST = 0.0          # time.time() of the last translation the GAME asked for: the background run of "all mods" steps aside while it is recent
+
+
+def seconds_since_game_request():
+    return time.time() - LAST_GAME_REQUEST
+
+
 def translate_texts(source, target, texts):
     if languages.same(source, target):
         return list(texts)
@@ -145,9 +152,14 @@ def make_handler(token):
                 if not _code_ok(source) or not _code_ok(target) or not isinstance(texts, list) or len(texts) > MAX_TEXTS \
                         or not all(isinstance(t, str) for t in texts):
                     raise HttpError(400, "need source/target language codes and texts:list[str] (<=500)")
+                global LAST_GAME_REQUEST
+                mod = data.get("mod") if isinstance(data.get("mod"), str) else ""
+                if mod and not mod.startswith("("):
+                    LAST_GAME_REQUEST = time.time()               # a real mod asked (not the "(translator check)" probe)
                 t0 = time.perf_counter()
                 out = translate_texts(source, target, texts)
-                mod = data.get("mod") if isinstance(data.get("mod"), str) else ""
+                if mod and not mod.startswith("("):
+                    LAST_GAME_REQUEST = time.time()
                 activity.emit("game", "log_game_batch",
                               {"n": len(texts), "src": source, "tgt": target, "mod": mod[:120] or "?", "chars": sum(map(len, texts)),
                                "ms": int((time.perf_counter() - t0) * 1000),
