@@ -7,6 +7,7 @@ Resizable: texts re-wrap and widgets stretch. Texts follow the system language (
 The translation server runs in a background thread. Falls back to the console when no window can be opened."""
 import os
 import queue
+import re
 import subprocess
 import sys
 import threading
@@ -79,12 +80,13 @@ def selectable_label_class():
                              selectbackground="#3d7be0", selectforeground="white", inactiveselectbackground="#a8c4f0")
             self._text, self._wrap, self._anchor, self._justify = "", wraplength, anchor, justify
             self._autowidth, self._font = autowidth, f          # autowidth: a short caption that is as wide as its text (not stretched)
+            self._laid_width, self._laid_lines = 0, 0
             self.bind("<Button-1>", lambda e: self.focus_set())
             self.bind("<Control-a>", self._select_all)
             self.bind("<Control-c>", self._copy)
             self.bind("<<Copy>>", self._copy)
             self.bind("<Button-3>", self._menu)
-            self.bind("<Configure>", lambda e: self._fit())
+            self.bind("<Configure>", lambda e: self._on_configure())
             self.bind("<Key>", lambda e: None if (e.state & 4 and e.keysym.lower() in ("c", "a")) else "break")
             self._set(text)
 
@@ -93,13 +95,93 @@ def selectable_label_class():
             self.tag_configure("t", justify=j)
             self.tag_add("t", "1.0", "end")
 
-        def _set(self, text):
-            self._text = str(text)
+        # ---- justified text ("fill"): Tk has no full justification, so the lines are broken here and the gaps between the words are
+        # made of spaces of different widths (normal, en/em, thin and hair spaces) until every line but the last of a paragraph is as wide as the box
+        _SPACES = ("\u2003", "\u2002", "\u2004", "\u2005", "\u2006", "\u2009", "\u200a")
+
+        def _space_units(self):
+            units = {}
+            for ch in (" ",) + self._SPACES:
+                w = self._font.measure(ch)
+                if w > 0 and w not in units:
+                    units[w] = ch
+            return sorted(units.items(), reverse=True)
+
+        def _gap(self, width, units):
+            """A run of spaces about `width` pixels wide."""
+            out = []
+            while units and width >= units[-1][0]:
+                for w, ch in units:
+                    if w <= width:
+                        out.append(ch)
+                        width -= w
+                        break
+            return "".join(out) or " "
+
+        def _fill_lines(self, avail):
+            """[(text of the line, artificial break after it)] for the text in a box `avail` pixels wide."""
+            sw = max(1, self._font.measure(" "))
+            units = self._space_units()
+            out = []
+            for para in self._text.split("\n"):
+                words = [w for w in para.split(" ") if w != ""]
+                lines, cur, curw = [], [], 0
+                for w in words:
+                    ww = self._font.measure(w)
+                    add = ww if not cur else ww + sw
+                    if cur and curw + add > avail:
+                        lines.append(cur)
+                        cur, curw = [w], ww
+                    else:
+                        cur.append(w)
+                        curw += add
+                if cur:
+                    lines.append(cur)
+                if not lines:
+                    out.append(("", False))
+                for i, ln in enumerate(lines):
+                    last = i == len(lines) - 1
+                    if last or len(ln) < 2:
+                        out.append((" ".join(ln), not last))
+                        continue
+                    natural = sum(self._font.measure(w) for w in ln) + (len(ln) - 1) * sw
+                    slack = max(0, avail - natural)
+                    gaps = len(ln) - 1
+                    text = ln[0]
+                    for k in range(gaps):
+                        extra = slack // gaps + (1 if k < slack % gaps else 0)
+                        text += self._gap(sw + extra, units) + ln[k + 1]
+                    out.append((text, True))
+            return out
+
+        def _render(self):
             super().configure(state="normal")
             self.delete("1.0", "end")
-            self.insert("1.0", self._text)
+            filled = self._justify == "fill" and self.winfo_width() >= 40
+            if filled:
+                avail = self.winfo_width() - 2
+                lines = self._fill_lines(avail)
+                super().configure(wrap="none")
+                for i, (ln, soft) in enumerate(lines):
+                    self.insert("end", ln)
+                    if i < len(lines) - 1:
+                        self.insert("end", "\n", "soft" if soft else ())
+                self._laid_width, self._laid_lines = self.winfo_width(), len(lines)
+            else:
+                super().configure(wrap="word")
+                self.insert("1.0", self._text)
+                self._laid_width, self._laid_lines = 0, 0
             self._tag()
             super().configure(state="disabled")
+
+        def _on_configure(self):
+            if self._justify == "fill" and abs(self.winfo_width() - self._laid_width) > 1 and self.winfo_width() >= 40:
+                self._render()                                           # the box changed width: break the lines again
+            self._fit()
+
+        def _set(self, text):
+            self._text = str(text)
+            self._render()
             if self._autowidth:
                 zero = max(1, self._font.measure("0"))
                 super().configure(width=max(1, -(-self._font.measure(self._text) // zero) + 1))
@@ -109,9 +191,12 @@ def selectable_label_class():
             try:
                 if self.winfo_width() < 20:
                     return
-                self.update_idletasks()
-                n = self.count("1.0", "end-1c", "update", "displaylines")
-                n = ((n[0] if isinstance(n, tuple) else n) or 0) + 1          # count = display lines BETWEEN the two indexes: one less than the lines shown
+                if self._justify == "fill" and self._laid_lines:
+                    n = self._laid_lines
+                else:
+                    self.update_idletasks()
+                    n = self.count("1.0", "end-1c", "update", "displaylines")
+                    n = ((n[0] if isinstance(n, tuple) else n) or 0) + 1          # count = display lines BETWEEN the two indexes: one less than the lines shown
                 if int(str(super().cget("height"))) != n:
                     super().configure(height=n)
             except Exception:  # noqa: BLE001
@@ -123,7 +208,18 @@ def selectable_label_class():
 
         def _copy(self, _e=None):
             try:
-                txt = self.get("sel.first", "sel.last")
+                self.index("sel.first")
+                out, soft = [], False
+                for kind, val, _idx in self.dump("sel.first", "sel.last", text=True, tag=True):
+                    if kind == "tagon" and val == "soft":
+                        soft = True
+                    elif kind == "tagoff" and val == "soft":
+                        soft = False
+                    elif kind == "text":
+                        out.append(" " if soft and val == "\n" else val)                 # an artificial line break is a space again
+                txt = re.sub(r"[\u2002-\u200a]", " ", "".join(out))
+                if self._justify == "fill":
+                    txt = re.sub(r" {2,}", " ", txt)
             except tk.TclError:
                 txt = self._text
             self.clipboard_clear()
@@ -146,7 +242,7 @@ def selectable_label_class():
             for k in ("anchor", "justify"):
                 if k in kw:
                     setattr(self, "_" + k, kw.pop(k))
-                    self._tag()
+                    self._render()
             if "foreground" in kw:
                 super().configure(foreground=kw.pop("foreground") or ttk.Style().lookup("TLabel", "foreground") or "black")
             kw.pop("padding", None)
@@ -174,6 +270,109 @@ def fit_columns(tree):
         need = f.measure(str(tree.heading(c, "text"))) + 26
         cur = int(tree.column(c, "width"))
         tree.column(c, minwidth=max(need, int(tree.column(c, "minwidth"))), width=max(cur, need))
+
+
+_ROUNDED = None
+
+
+def rounded_button_class():
+    """A coloured button with rounded corners, drawn on a canvas (the native Windows buttons are rounded, and a plain tk.Button cannot be
+    coloured AND rounded). Same height and font as the ttk buttons around it (see App.match_button_height); behaves like a button:
+    configure(text=, state=, bg=), cget, invoke(), hover and pressed looks, Space/Enter when focused."""
+    global _ROUNDED
+    if _ROUNDED is not None:
+        return _ROUNDED
+    import tkinter as tk
+    from tkinter import font as tkfont, ttk
+
+    class RoundedButton(tk.Canvas):
+        def __init__(self, parent, text="", command=None, fill="#2e7d32", dark="#1b5e20", off="#9aa5a0", fg="white", radius=5, state="normal"):
+            bg = ttk.Style().lookup("TFrame", "background") or parent.winfo_toplevel().cget("background")
+            super().__init__(parent, height=24, width=60, highlightthickness=0, bd=0, background=bg, cursor="hand2", takefocus=1)
+            self._font = tkfont.nametofont("TkDefaultFont")
+            self._text, self._command, self._fill, self._dark, self._off, self._fg = text, command, fill, dark, off, fg
+            self._radius, self._state, self._hover, self._down = radius, state, False, False
+            self.bind("<Configure>", lambda e: self._draw())
+            self.bind("<Enter>", lambda e: self._set_hover(True))
+            self.bind("<Leave>", lambda e: self._set_hover(False))
+            self.bind("<ButtonPress-1>", self._press)
+            self.bind("<ButtonRelease-1>", self._release)
+            self.bind("<space>", lambda e: self.invoke())
+            self.bind("<Return>", lambda e: self.invoke())
+            self._resize_to_text()
+
+        def _resize_to_text(self):
+            super().configure(width=self._font.measure(self._text) + 28)
+            self._draw()
+
+        def _set_hover(self, on):
+            self._hover = on and self._state == "normal"
+            self._draw()
+
+        def _press(self, _e):
+            if self._state == "normal":
+                self._down = True
+                self.focus_set()
+                self._draw()
+
+        def _release(self, e):
+            was, self._down = self._down, False
+            self._draw()
+            if was and 0 <= e.x <= self.winfo_width() and 0 <= e.y <= self.winfo_height():
+                self.invoke()
+
+        def invoke(self):
+            if self._state == "normal" and self._command:
+                return self._command()
+
+        def _draw(self):
+            self.delete("all")
+            w, h = max(self.winfo_width(), int(self.cget("width"))), max(self.winfo_height(), int(self.cget("height")))
+            if self.winfo_width() > 1:
+                w = self.winfo_width()
+            r = self._radius
+            fill = self._off if self._state != "normal" else (self._dark if (self._hover or self._down) else self._fill)
+            x1, y1, x2, y2 = 0, 0, w - 1, h - 1
+            pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
+            self.create_polygon(pts, smooth=True, fill=fill, outline=self._dark if self._state == "normal" else "#8a9590")
+            self.create_text(w / 2, h / 2 + (1 if self._down else 0), text=self._text, fill=self._fg if self._state == "normal" else "#eeeeee",
+                             font=self._font)
+
+        def configure(self, cnf=None, **kw):
+            if cnf:
+                kw.update(cnf)
+            if "text" in kw:
+                self._text = str(kw.pop("text"))
+                self._resize_to_text()
+            if "state" in kw:
+                self._state = kw.pop("state")
+                self._hover = False
+            if "command" in kw:
+                self._command = kw.pop("command")
+            if "bg" in kw:                                    # the colour of the button: green when it can be used
+                new = kw.pop("bg")
+                if new != self._off:
+                    self._fill = new
+            for k in ("pady", "padx", "fg", "activebackground", "activeforeground", "disabledforeground", "relief", "bd", "cursor",
+                      "highlightthickness", "highlightbackground", "highlightcolor", "font"):
+                kw.pop(k, None)
+            if "height" in kw:
+                super().configure(height=kw.pop("height"))
+            if kw:
+                super().configure(**kw)
+            self._draw()
+            return None
+        config = configure
+
+        def cget(self, key):
+            if key == "text":
+                return self._text
+            if key == "state":
+                return self._state
+            return super().cget(key)
+
+    _ROUNDED = RoundedButton
+    return _ROUNDED
 
 
 def enable_copy(tree):
@@ -340,22 +539,20 @@ class App:
         self.card1 = ttk.LabelFrame(cards, padding=10)
         self.card1.grid(row=0, column=0, sticky="nsew")
         self.card1.columnconfigure(0, weight=1)
-        self.lbl_opt1_body = Sel(self.card1, anchor="w", justify="left")
+        self.lbl_opt1_body = Sel(self.card1, anchor="w", justify="fill")
         self.lbl_opt1_body.grid(row=0, column=0, sticky="ew")
-        self.lbl_opt1_note = Sel(self.card1, foreground="#555555", anchor="w", justify="left")
+        self.lbl_opt1_note = Sel(self.card1, foreground="#555555", anchor="w", justify="fill")
         self.lbl_opt1_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         self.lbl_or = ttk.Label(cards, font=("TkDefaultFont", 11, "bold"), foreground="#777777")
         self.lbl_or.grid(row=0, column=1, padx=10)
         self.card2 = ttk.LabelFrame(cards, padding=10)
         self.card2.grid(row=0, column=2, sticky="nsew")
         self.card2.columnconfigure(0, weight=1)
-        self.lbl_opt2_body = Sel(self.card2, anchor="w", justify="left")
+        self.lbl_opt2_body = Sel(self.card2, anchor="w", justify="fill")
         self.lbl_opt2_body.grid(row=0, column=0, sticky="ew")
-        self.lbl_opt2_note = Sel(self.card2, foreground="#555555", anchor="w", justify="left")
+        self.lbl_opt2_note = Sel(self.card2, foreground="#555555", anchor="w", justify="fill")
         self.lbl_opt2_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
-        self.btn_go_bulk = self.tk.Button(self.card2, command=lambda: self.nb.select(self.bulk_tab), bg=ACCENT, fg="white",
-                                          activebackground=ACCENT_DARK, activeforeground="white", relief="flat", bd=0, padx=10, pady=6,
-                                          cursor="hand2", font=("TkDefaultFont", 10, "bold"))
+        self.btn_go_bulk = rounded_button_class()(self.card2, command=lambda: self.nb.select(self.bulk_tab), fill=ACCENT, dark=ACCENT_DARK, off=ACCENT_OFF)
         self.btn_go_bulk.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         self.lbl_restart = Sel(content, foreground="#8a5a00", anchor="center", justify="center")        # restart if the game does not show new translations
         self.lbl_restart.grid(row=3, column=0, sticky="ew", pady=(8, 0))
@@ -403,9 +600,7 @@ class App:
         self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
         self.btn_scan = ttk.Button(btns, command=self.refresh_plan)
         # the main action stands out: a coloured button (a plain tk.Button, because the native ttk buttons of Windows ignore colours)
-        self.btn_bulk = self.tk.Button(btns, command=lambda: self.start_bulk(False), state="disabled", bg=ACCENT_OFF, fg="white",
-                                       activebackground=ACCENT_DARK, activeforeground="white", disabledforeground="#eeeeee",
-                                       relief="flat", bd=0, padx=10, pady=5, cursor="hand2", font=("TkDefaultFont", 10, "bold"))
+        self.btn_bulk = rounded_button_class()(btns, command=lambda: self.start_bulk(False), fill=ACCENT, dark=ACCENT_DARK, off=ACCENT_OFF, state="disabled")
         self.btn_bulk_all = ttk.Button(btns, command=lambda: self.start_bulk(True))
         self.btn_stop = ttk.Button(btns, command=self.stop_bulk, state="disabled")
         self.btn_clear = ttk.Button(btns, command=self.clear_translations)
@@ -449,7 +644,7 @@ class App:
         self.log_hint = self.field(lg, 0, pady=(0, 6), color="#666666")
         bar = ttk.Frame(lg)
         bar.grid(row=1, column=0, sticky="ew", pady=(0, 6))
-        bar.columnconfigure(3, weight=1)
+        bar.columnconfigure(5, weight=1)                      # spare room at the right: the buttons stay together on the left
         self.lbl_log_filter = selectable_label_class()(bar, autowidth=True, anchor="w", justify="left")
         self.lbl_log_filter.grid(row=0, column=0, padx=(0, 6))
         self.log_filter_box = ttk.Combobox(bar, state="readonly", width=24)
@@ -458,9 +653,9 @@ class App:
         self.btn_log_copy = ttk.Button(bar, command=self.copy_log)
         self.btn_log_copy.grid(row=0, column=2, padx=3)
         self.btn_log_clear = ttk.Button(bar, command=self.clear_log)
-        self.btn_log_clear.grid(row=0, column=3, padx=3, sticky="w")
-        self.btn_log_folder = ttk.Button(bar, command=lambda: open_folder(logs_dir()))
-        self.btn_log_folder.grid(row=0, column=4, padx=3, sticky="e")
+        self.btn_log_clear.grid(row=0, column=3, padx=3)
+        self.btn_log_folder = ttk.Button(bar, command=lambda: open_folder(logs_dir()))      # right next to "Clear"
+        self.btn_log_folder.grid(row=0, column=4, padx=3)
         tf = ttk.Frame(lg)
         tf.grid(row=2, column=0, sticky="nsew")
         tf.columnconfigure(0, weight=1)
@@ -598,6 +793,16 @@ class App:
         self.log_entries = []
         self.render_log()
 
+    def match_button_height(self):
+        """The coloured buttons get the same height as the native buttons around them, so they look like one family."""
+        try:
+            self.root.update_idletasks()
+            target = self.btn_add_dir.winfo_reqheight()
+            for b in (self.btn_bulk, self.btn_go_bulk):
+                b.configure(height=target)
+        except Exception:  # noqa: BLE001
+            log.exception("could not match the button heights")
+
     def on_resize(self, event):
         if event.widget is not self.root:
             return
@@ -629,7 +834,7 @@ class App:
         self.lbl_or.configure(text=t("opt_or"))
         self.lbl_restart.configure(text=t("restart_note"))
         self.chk_bg.configure(text=t("bg_all"))
-        self.lbl_bg_note.configure(text=t("bg_note"))
+        self.update_bg_note()
         self.lbl_ui.configure(text=t("ui_lang"))
         self.lbl_target.configure(text=t("target_lang"))
         self.btn_model.configure(text=t("download_model"))
@@ -659,6 +864,7 @@ class App:
         self.render_rows()
         self.apply_log_language()
         self.refresh_details_windows()
+        self.match_button_height()
         self.fit_window()
 
     def fit_window(self):
@@ -988,7 +1194,15 @@ class App:
         self.refresh_plan()
         self.bulk_progress.set_key("bulk_cleared", n=n, lang=label)
 
+    def update_bg_note(self):
+        """While a translation is running the "also translate the disabled mods" option is locked (stop the run first), so the setting
+        and what is happening never disagree."""
+        busy = self.bulk_running
+        self.chk_bg.state(["disabled"] if busy else ["!disabled"])
+        self.lbl_bg_note.configure(text=self.t("bg_locked") if busy else self.t("bg_note"))
+
     def update_bulk_buttons(self):
+        self.update_bg_note()
         pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
         self.btn_bulk.configure(text=self.t("bulk_start_pending", n=pend))
         idle = not self.bulk_running

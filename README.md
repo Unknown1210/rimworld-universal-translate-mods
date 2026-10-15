@@ -5,7 +5,7 @@
 <a href="README.en.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-2ea44f?style=for-the-badge" alt="English"></a>
 </p>
 
-<p align="center"><b>Versão atual / Current version: 0.022</b> · <a href="../../releases/latest">Releases</a></p>
+<p align="center"><b>Versão atual / Current version: 0.023</b> · <a href="../../releases/latest">Releases</a></p>
 
 <div align="center">
 

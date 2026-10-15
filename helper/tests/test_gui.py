@@ -236,6 +236,54 @@ class Window(unittest.TestCase):
         self.assertFalse(app.bg_enabled())
         config.set("background_all", True)
 
+    def test_log_buttons_sit_together_on_the_left(self):
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        cols = {str(app.btn_log_copy.grid_info()["column"]), str(app.btn_log_clear.grid_info()["column"]), str(app.btn_log_folder.grid_info()["column"])}
+        self.assertEqual(cols, {"2", "3", "4"})
+        self.assertEqual(str(app.btn_log_folder.grid_info().get("sticky", "")), "", "not pushed to the right edge")
+
+    def test_background_option_is_locked_while_a_translation_runs(self):
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        self.assertFalse(app.chk_bg.instate(["disabled"]))
+        app.bulk_running = True
+        app.update_bulk_buttons()
+        self.assertTrue(app.chk_bg.instate(["disabled"]), "can not be changed while translating: stop the run first")
+        self.assertIn("Parar", app.lbl_bg_note.cget("text"))
+        app.bulk_running = False
+        app.update_bulk_buttons()
+        self.assertFalse(app.chk_bg.instate(["disabled"]))
+        self.assertNotIn("Parar", app.lbl_bg_note.cget("text"))
+
+    def test_justified_text_fills_every_line_and_copies_as_plain_text(self):
+        import tkinter.font as tkfont
+        from rwtranslate import gui
+        self.build(fake_fetcher(release_json("v0.0")))
+        import tkinter
+        Sel = gui.selectable_label_class()
+        frame = tkinter.Frame(self.root, width=380, height=260)           # a fixed-width box: the number of lines does not depend on the window
+        frame.pack_propagate(False)
+        frame.place(x=0, y=0)
+        text = ("Deixe esta janela aberta enquanto joga RimWorld. O jogo pede e o programa traduz sozinho, mod por mod, e salva tudo. "
+                "Serve para os mods ativados e para os textos que só existem durante o jogo.\n\nSegundo parágrafo curto.")
+        lab = Sel(frame, text=text, anchor="w", justify="fill")
+        lab.pack(fill="x", padx=10, pady=10)
+        for _ in range(8):
+            self.root.update()
+        font = tkfont.nametofont("TkDefaultFont")
+        avail = lab.winfo_width() - 2
+        lines = lab.get("1.0", "end-1c").split("\n")
+        self.assertGreater(len(lines), 3)
+        body = lines[:lines.index("")]                                        # the first paragraph
+        for ln in body[:-1]:
+            self.assertAlmostEqual(font.measure(ln), avail, delta=4, msg="a justified line is as wide as the box: " + ln)
+        self.assertLess(font.measure(body[-1]), avail - 20, "the last line of a paragraph is not stretched")
+        self.assertEqual(int(str(lab.cget("height"))), len(lines))
+        lab._select_all()
+        lab._copy()
+        self.assertEqual(self.root.clipboard_get(), text, "what you paste is the plain text, in a single paragraph")
+        lab.destroy()
+        frame.destroy()
+
     def test_polite_run_waits_while_the_game_is_asking(self):
         import time
         from rwtranslate import bulk, server

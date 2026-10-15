@@ -4,6 +4,13 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.023 - 2026-10-15
+- Alterado: o botão "Traduzir pendentes" (e o "Ir para Traduzir mods" da aba Início) é verde, com cantos arredondados, a mesma letra e a mesma altura dos outros botões, ficando cinza quando não há nada a fazer.
+- Alterado: os textos das duas opções da aba Início ficaram justificados; ao copiar, o texto vai normal, sem espaços especiais nem quebras de linha artificiais.
+- Alterado: a caixa "Traduzir também os mods desativados, em segundo plano" fica travada enquanto uma tradução estiver rodando (com um aviso para parar a tradução antes de mudar a opção).
+- Alterado: na aba Log, o botão "Abrir pasta de logs" ficou ao lado de "Copiar log" e "Limpar", à esquerda.
+- Adicionado: testes novos para a justificação do texto, a trava da caixa de segundo plano e a posição dos botões do Log.
+
 ## v0.022 - 2026-10-15
 - Alterado: a aba "Traduzir mods" do executável passa a acompanhar o que o jogo traduz sozinho: a linha de cada mod mostra o idioma de origem, os textos e as palavras já traduzidos e o estado ("Traduzindo pelo jogo..." e depois "Traduzido pelo jogo"), e o resumo soma tudo; mods traduzidos pelo jogo em outra sessão aparecem com os números do arquivo de tradução salvo.
 - Alterado: o botão "Traduzir pendentes" ficou verde (cinza quando não há nada a fazer) para se destacar; os botões "Abrir pasta de dados" e "Abrir pasta do mod" ficaram só na aba Início.
