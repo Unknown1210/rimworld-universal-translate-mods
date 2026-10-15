@@ -462,6 +462,8 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
             continue
         groups.setdefault(lang, []).append(text)
     new_entries = {}
+    words_total = sum(count_words(t) for g in groups.values() for t in g)
+    words_done = 0
     for lang, texts in groups.items():
         res.langs[lang] = len(texts)
         res.texts += len(texts)
@@ -470,6 +472,7 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
             if t in cache:
                 res.from_cache += 1
                 res.words += count_words(t)
+                words_done += count_words(t)
             else:
                 todo.append(t)
         if not todo:
@@ -481,8 +484,14 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
                     res.skipped.append({"text": t, "reason": "unsupported", "detail": f"{lang}->{target}"})
             continue
         done0 = res.from_cache + res.translated
+        prefix = [0]
+        for t in todo:
+            prefix.append(prefix[-1] + count_words(t))
+        wbase = words_done
         got = _translate_group(lang, target, todo, res, cancel,
-                               lambda n: progress({"event": "mod_progress", "name": mod.name, "done": done0 + n, "total": res.texts}))
+                               lambda n: progress({"event": "mod_progress", "name": mod.name, "done": done0 + n, "total": res.texts,
+                                                   "words_done": wbase + prefix[min(n, len(todo))], "words_total": words_total}))
+        words_done += prefix[-1]
         for t, tr in got.items():
             new_entries[t] = tr
             res.translated += 1

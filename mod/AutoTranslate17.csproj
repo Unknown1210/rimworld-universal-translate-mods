@@ -10,7 +10,7 @@
     <AssemblyName>RimWorldAutoTranslate</AssemblyName>
     <RootNamespace>AutoTranslate</RootNamespace>
     <LangVersion>7.3</LangVersion>
-    <Version>0.025.0</Version>
+    <Version>0.026.0</Version>
     <OutputPath>1.7/Assemblies/</OutputPath>
     <BaseIntermediateOutputPath>obj17/</BaseIntermediateOutputPath>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

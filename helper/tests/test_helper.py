@@ -413,6 +413,15 @@ class FakeSP:
         return s.split()
 
 
+class ProgressLine(unittest.TestCase):
+    def test_line_shows_texts_and_words(self):
+        from rwtranslate import i18n
+        for lang in ("pt", "en"):
+            line = i18n.TEXT[lang]["bulk_current"].format(name="X", done=1, total=2, wdone=3, wtotal=4)
+            self.assertIn("1/2", line)
+            self.assertIn("3/4", line)
+
+
 class EngineSafety(unittest.TestCase):
     """Speed must never cost correctness: loops are caught, the stop button works, big requests are cut in chunks."""
 

@@ -1519,13 +1519,14 @@ class App:
         elif ev == "model":
             self.bulk_current.set_key("bulk_model", pair=e["pair"])
         elif ev == "mod_start":
-            self.bulk_current.set_key("bulk_current", name=e["name"], done=0, total=0)
+            self.bulk_current.set_key("bulk_current", name=e["name"], done=0, total=0, wdone=0, wtotal=0)
             for pid, (m, s, r) in ((m.package_id, row) for row in self.plan_rows for m in [row[0]]):
                 if m.name == e["name"] and pid in self.rows:
                     self.tree.item(self.rows[pid], values=self._with_folder(self._row_values(m, s, r, running=True)))
                     self.tree.see(self.rows[pid])
         elif ev == "mod_progress":
-            self.bulk_current.set_key("bulk_current", name=e["name"], done=e["done"], total=e["total"])
+            self.bulk_current.set_key("bulk_current", name=e["name"], done=e["done"], total=e["total"],
+                                        wdone=e.get("words_done", 0), wtotal=e.get("words_total", 0))
             self.show_progress(getattr(self, "_done_mods", 0), getattr(self, "_total", 1), e["done"], e["total"])
         elif ev == "mod_done":
             r = e["result"]

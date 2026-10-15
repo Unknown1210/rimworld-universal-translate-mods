@@ -4,6 +4,10 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.026 - 2026-10-15
+- Adicionado: a linha "Traduzindo: mod (X/Y textos)" agora mostra também as palavras, em outro parêntese: "(X/Y palavras)", em português e em inglês.
+- Adicionado: teste novo para o formato da linha de progresso.
+
 ## v0.025 - 2026-10-15
 - Adicionado: no menu do mod, um botão depois de "traduzindo para ..." para escolher o idioma entre os que já têm tradução feita pelo programa (ou voltar para automático).
 - Alterado: a tradução em lote ficou mais rápida: todos os textos de um pedido vão ao modelo numa só chamada e o uso de processador subiu.
