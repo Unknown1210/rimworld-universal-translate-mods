@@ -102,16 +102,19 @@ namespace AutoTranslate
             if (Third > 0) parts.Add(T.Get("AT_R_Third", string.Join(", ", new List<string>(ProviderCounts.Keys).ToArray()), Third));
             if (Found > 0)
             {
-                string a = T.Get("AT_R_Auto", Translated + FromCache, Found);
+                string a = T.Get("AT_R_Auto", Math.Min(100, (Translated + FromCache) * 100 / Found));      // rounded DOWN: 100% only when nothing is missing
                 var extra = new List<string>();
                 if (Failed > 0) extra.Add(T.Get("AT_R_Failed", Failed));
                 if (FromCache > 0) extra.Add(T.Get("AT_R_Cache", FromCache));
                 parts.Add(extra.Count > 0 ? a + " (" + string.Join(", ", extra.ToArray()) + ")" : a);
+                var langs = new List<string>();
+                foreach (string code in LangMap.CachedLanguagesFor(Id)) langs.Add(LangNames.Label(code));
+                if (langs.Count > 0) parts.Add(T.Get("AT_R_Langs", string.Join(", ", langs.ToArray())));
             }
             if (AlreadyTarget > 0) parts.Add(T.Get("AT_R_Already", AlreadyTarget));
             if (Placeholders > 0) parts.Add(T.Get("AT_R_Placeholder", Placeholders));
             if (EnglishUnavailable > 0) parts.Add(T.Get("AT_R_Unavail", EnglishUnavailable));
-            foreach (string lang in SourceCounts.Keys) parts.Add(SupportLine(lang));
+            foreach (string lang in SourceCounts.Keys) { string sl = SupportLine(lang); if (sl != null) parts.Add(sl); }
             return parts.Count == 0 ? T.Get("AT_R_Nothing") : string.Join("   |   ", parts.ToArray());
         }
 
@@ -124,7 +127,7 @@ namespace AutoTranslate
             if (!have) return T.Get("AT_R_Checking", a, b);
             if (!s.Known) return T.Get("AT_R_SupportUnknown", a, b);
             if (!s.Supported) return "<color=#ff7777>" + T.Get("AT_R_NoSupport", a, b) + "</color>";
-            return "<color=#88dd88>" + T.Get(s.Download.Count > 0 ? "AT_R_SupportDownload" : "AT_R_Support", a, b) + "</color>";
+            return null;                                  // supported: nothing to say (only the problems are shown)
         }
 
         public string StatusText()

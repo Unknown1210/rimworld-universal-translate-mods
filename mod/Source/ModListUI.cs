@@ -34,12 +34,15 @@ namespace AutoTranslate
             Rect inner = rect.ContractedBy(10f);
             GameFont old0 = Text.Font;
             Text.Font = GameFont.Medium;
-            Widgets.Label(new Rect(inner.x, inner.y, inner.width, 30f), T.Get("AT_Mods", q.Length == 0 ? all.ToString() : mods.Count + "/" + all));
+            string title = T.Get("AT_Mods", q.Length == 0 ? all.ToString() : mods.Count + "/" + all) + ":";
+            float titleW = Text.CalcSize(title).x + 6f;
+            Widgets.Label(new Rect(inner.x, inner.y, titleW, 30f), title);
             Text.Font = GameFont.Tiny;
-            Widgets.Label(new Rect(inner.x, inner.y + 30f, inner.width, 20f), T.Get("AT_ModsHint"));
+            // the hint sits right after the title, on the same line (its baseline close to the big text)
+            Widgets.Label(new Rect(inner.x + titleW, inner.y + 9f, Math.Max(0f, inner.width - titleW), 22f), T.Get("AT_ModsHint"));
             Text.Font = old0;
             // one toolbar line: search on the left, the two bulk buttons on the right, all the same height
-            float ty = inner.y + 56f, th = 28f;
+            float ty = inner.y + 38f, th = 28f;
             Widgets.Label(new Rect(inner.x, ty + 2f, 110f, th), T.Get("AT_Search"));
             search = Widgets.TextField(new Rect(inner.x + 112f, ty, Math.Min(230f, inner.width * 0.32f), th), search ?? "");
             float left = 112f + Math.Min(230f, inner.width * 0.32f) + 12f;

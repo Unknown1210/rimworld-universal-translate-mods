@@ -77,7 +77,7 @@ namespace Verse
         public static bool CanTranslate(this string key) { return Look(LanguageDatabase.activeLanguage, key) != null || Look(LanguageDatabase.defaultLanguage, key) != null; }
     }
     public enum GameFont { Tiny, Small, Medium }
-    public static class Text { public static GameFont Font; }
+    public static class Text { public static GameFont Font; public static UnityEngine.Vector2 CalcSize(string s) { UnityEngine.Vector2 v; v.x = s.Length * 7f; v.y = 20f; return v; } }
     public class ModMetaData
     {
         string description = "", descriptionCached = ""; System.Collections.Generic.Dictionary<string, string> descriptionsByVersion = new System.Collections.Generic.Dictionary<string, string>();

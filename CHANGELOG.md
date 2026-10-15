@@ -4,6 +4,15 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.028 - 2026-10-15
+- Alterado: na lista de mods do menu do mod, a descrição agora fica na mesma linha do título ("Mods (51): Só os textos que ainda não têm tradução são traduzidos."), e a lista ganhou um pouco de altura.
+- Alterado: os nomes das opções de tradução ficaram mais curtos e cabem nos botões: "Tradução do próprio mod", "Tradução de outro mod" e "Sempre a automática".
+- Alterado: o menu de aplicar a todos agora mostra "Todos (N): opção", mais curto.
+- Alterado: o botão "Diagnóstico de todos" passou a se chamar "Diagnóstico".
+- Alterado: a linha de cada mod mostra "Traduzido: N%" (em vez de "Traduzidos: X/Y (X do cache)") e, depois, "Nos seguintes idiomas: ..." com os idiomas em que o mod já tem tradução salva.
+- Removido: a frase "X para Y: com suporte" da linha de cada mod; só aparecem os casos com problema (sem suporte, desconhecido ou verificando).
+- Adicionado: teste novo para o percentual e a lista de idiomas na linha do mod.
+
 ## v0.027 - 2026-10-15
 - Alterado: na aba Log, a caixa "Mostrar" ficou com a mesma altura dos botões (Copiar log, Limpar, Abrir pasta de logs).
 - Alterado: enquanto há uma tradução em andamento, o idioma de destino também fica travado (como já era a opção "Traduzir também os mods desativados"); para mudar é preciso apertar Parar antes, e o aviso na tela explica isso.

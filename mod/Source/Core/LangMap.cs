@@ -131,6 +131,37 @@ namespace AutoTranslate
             return list;
         }
 
+        static readonly Dictionary<string, KeyValuePair<DateTime, List<string>>> modLangMemo = new Dictionary<string, KeyValuePair<DateTime, List<string>>>();
+
+        /// <summary>Languages in which THIS mod has a saved translation (cache/&lt;lang&gt;/&lt;packageId&gt;.json), sorted. The answer is kept
+        /// for a few seconds because the mod list asks for it on every frame.</summary>
+        public static List<string> CachedLanguagesFor(string packageId)
+        {
+            lock (modLangMemo)
+            {
+                KeyValuePair<DateTime, List<string>> hit;
+                if (modLangMemo.TryGetValue(packageId ?? "", out hit) && (DateTime.UtcNow - hit.Key).TotalSeconds < 5) return hit.Value;
+            }
+            var list = new List<string>();
+            try
+            {
+                if (Directory.Exists(Paths.CacheDir))
+                {
+                    string file = Paths.SafeFileName(packageId ?? "") + ".json";
+                    foreach (string d in Directory.GetDirectories(Paths.CacheDir))
+                    {
+                        string code = NormTarget(Path.GetFileName(d));
+                        if (string.IsNullOrEmpty(code) || list.Contains(code)) continue;
+                        if (File.Exists(Path.Combine(d, file))) list.Add(code);
+                    }
+                }
+            }
+            catch (Exception e) { AtLog.Warn("config", "cannot list the languages of a mod (ignored)", e); }
+            list.Sort(StringComparer.Ordinal);
+            lock (modLangMemo) modLangMemo[packageId ?? ""] = new KeyValuePair<DateTime, List<string>>(DateTime.UtcNow, list);
+            return list;
+        }
+
         /// <summary>Settings value "auto" -> game language if not English, else OS language; otherwise the given code.</summary>
         public static string ResolveTarget(string setting, out string how)
         {

@@ -20,20 +20,20 @@
   <AT_HelperProblem>Translator program: {0}</AT_HelperProblem>
   <AT_Search>Search mods:</AT_Search>
   <AT_ApplyAll>Apply to all ({0})...</AT_ApplyAll>
-  <AT_ApplyAllTo>All {1} shown: {0}</AT_ApplyAllTo>
+  <AT_ApplyAllTo>All ({1}): {0}</AT_ApplyAllTo>
   <AT_BtnDiag>Diagnostic</AT_BtnDiag>
   <AT_DiagCopied>Diagnostic of '{0}' copied: paste it in a message.</AT_DiagCopied>
   <AT_ReenableAll>Turn translations back on for the {0} shown mod(s) switched off after problems</AT_ReenableAll>
-  <AT_DiagAll>Diagnostic of all</AT_DiagAll>
+  <AT_DiagAll>Diagnostic</AT_DiagAll>
   <AT_DiagAllSaved>Diagnostic of {0} mod(s) copied and saved to: {1}</AT_DiagAllSaved>
   <AT_Mods>Mods ({0})</AT_Mods>
   <AT_ModsHint>Only texts that have no translation yet are translated.</AT_ModsHint>
   <AT_Enabled>Enabled</AT_Enabled>
   <AT_Reenable>Re-enable</AT_Reenable>
   <AT_Mode_auto>Automatic (recommended)</AT_Mode_auto>
-  <AT_Mode_native>Prefer the mod's own translation</AT_Mode_native>
-  <AT_Mode_third>Prefer another translation mod</AT_Mode_third>
-  <AT_Mode_mine>Always automatic translation</AT_Mode_mine>
+  <AT_Mode_native>The mod's own translation</AT_Mode_native>
+  <AT_Mode_third>Another mod's translation</AT_Mode_third>
+  <AT_Mode_mine>Always automatic</AT_Mode_mine>
   <AT_Advanced>Advanced</AT_Advanced>
   <AT_AdvancedHide>Hide advanced options</AT_AdvancedHide>
   <AT_OptDefs>Translate items, buildings, etc. (Defs)</AT_OptDefs>
@@ -57,14 +57,13 @@
   <AT_R_AutoDisabled>Switched off after problems: {0}</AT_R_AutoDisabled>
   <AT_R_Own>Own translation: {0}</AT_R_Own>
   <AT_R_Third>Other mod ({0}): {1}</AT_R_Third>
-  <AT_R_Auto>Translated: {0}/{1}</AT_R_Auto>
+  <AT_R_Auto>Translated: {0}%</AT_R_Auto>
+  <AT_R_Langs>In these languages: {0}</AT_R_Langs>
   <AT_R_Failed>{0} failed</AT_R_Failed>
   <AT_R_Cache>{0} from cache</AT_R_Cache>
   <AT_R_Already>Already in your language: {0}</AT_R_Already>
   <AT_R_Placeholder>Translation files only repeat the original: {0} (translated anyway)</AT_R_Placeholder>
   <AT_R_Unavail>Original text unavailable: {0}</AT_R_Unavail>
-  <AT_R_Support>{0} to {1}: supported</AT_R_Support>
-  <AT_R_SupportDownload>{0} to {1}: supported (the model downloads on first use)</AT_R_SupportDownload>
   <AT_R_NoSupport>{0} to {1}: NO SUPPORT (left as it is)</AT_R_NoSupport>
   <AT_R_SupportUnknown>{0} to {1}: unknown (translator program not reachable)</AT_R_SupportUnknown>
   <AT_R_Checking>{0} to {1}: checking support...</AT_R_Checking>

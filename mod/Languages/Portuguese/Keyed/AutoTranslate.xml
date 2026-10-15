@@ -20,20 +20,20 @@
   <AT_HelperProblem>Programa tradutor: {0}</AT_HelperProblem>
   <AT_Search>Pesquisar mod:</AT_Search>
   <AT_ApplyAll>Aplicar a todos ({0})...</AT_ApplyAll>
-  <AT_ApplyAllTo>Todos os {1} exibidos: {0}</AT_ApplyAllTo>
+  <AT_ApplyAllTo>Todos ({1}): {0}</AT_ApplyAllTo>
   <AT_BtnDiag>Diagnóstico</AT_BtnDiag>
   <AT_DiagCopied>Diagnóstico de '{0}' copiado: cole numa mensagem.</AT_DiagCopied>
   <AT_ReenableAll>Religar as traduções dos {0} mod(s) exibidos desligados por problemas</AT_ReenableAll>
-  <AT_DiagAll>Diagnóstico de todos</AT_DiagAll>
+  <AT_DiagAll>Diagnóstico</AT_DiagAll>
   <AT_DiagAllSaved>Diagnóstico de {0} mod(s) copiado e guardado em: {1}</AT_DiagAllSaved>
   <AT_Mods>Mods ({0})</AT_Mods>
   <AT_ModsHint>Só os textos que ainda não têm tradução são traduzidos.</AT_ModsHint>
   <AT_Enabled>Ativado</AT_Enabled>
   <AT_Reenable>Reativar</AT_Reenable>
   <AT_Mode_auto>Automático (recomendado)</AT_Mode_auto>
-  <AT_Mode_native>Preferir a tradução do próprio mod</AT_Mode_native>
-  <AT_Mode_third>Preferir a tradução de outro mod</AT_Mode_third>
-  <AT_Mode_mine>Sempre a tradução automática</AT_Mode_mine>
+  <AT_Mode_native>Tradução do próprio mod</AT_Mode_native>
+  <AT_Mode_third>Tradução de outro mod</AT_Mode_third>
+  <AT_Mode_mine>Sempre a automática</AT_Mode_mine>
   <AT_Advanced>Avançado</AT_Advanced>
   <AT_AdvancedHide>Ocultar opções avançadas</AT_AdvancedHide>
   <AT_OptDefs>Traduzir itens, construções etc. (Defs)</AT_OptDefs>
@@ -57,14 +57,13 @@
   <AT_R_AutoDisabled>Desligado após problemas: {0}</AT_R_AutoDisabled>
   <AT_R_Own>Tradução própria: {0}</AT_R_Own>
   <AT_R_Third>Outro mod ({0}): {1}</AT_R_Third>
-  <AT_R_Auto>Traduzidos: {0}/{1}</AT_R_Auto>
+  <AT_R_Auto>Traduzido: {0}%</AT_R_Auto>
+  <AT_R_Langs>Nos seguintes idiomas: {0}</AT_R_Langs>
   <AT_R_Failed>{0} falharam</AT_R_Failed>
   <AT_R_Cache>{0} do cache</AT_R_Cache>
   <AT_R_Already>Já no seu idioma: {0}</AT_R_Already>
   <AT_R_Placeholder>Arquivos de tradução só repetem o original: {0} (traduzidos mesmo assim)</AT_R_Placeholder>
   <AT_R_Unavail>Texto original indisponível: {0}</AT_R_Unavail>
-  <AT_R_Support>{0} para {1}: com suporte</AT_R_Support>
-  <AT_R_SupportDownload>{0} para {1}: com suporte (o modelo é baixado no primeiro uso)</AT_R_SupportDownload>
   <AT_R_NoSupport>{0} para {1}: SEM SUPORTE (fica como está)</AT_R_NoSupport>
   <AT_R_SupportUnknown>{0} para {1}: desconhecido (programa tradutor sem conexão)</AT_R_SupportUnknown>
   <AT_R_Checking>{0} para {1}: verificando suporte...</AT_R_Checking>

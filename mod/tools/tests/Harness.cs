@@ -369,7 +369,8 @@ public static class Harness
         // support per mod
         string ja = Mod("j.japanese").StatusTextUi(), zh = Mod("e.chinese").StatusTextUi();
         Check(ja.Contains("SEM SUPORTE"), "Japanese -> Portuguese shown as NO SUPPORT: " + ja);
-        Check(zh.Contains("com suporte") && !zh.Contains("SEM SUPORTE"), "Chinese -> Portuguese shown as supported: " + zh);
+        Check(!zh.Contains("SUPORTE") && !zh.Contains("suporte") && zh.Contains("100%"), "Chinese -> Portuguese: supported says nothing, only the percentage: " + zh);
+        Check(zh.Contains("Nos seguintes idiomas"), "the languages already translated are listed: " + zh);
 
         // new target language without restarting the game
         AutoTranslateMod.Settings.language = "en";
