@@ -242,6 +242,36 @@ class Window(unittest.TestCase):
         self.assertEqual(cols, {"2", "3", "4"})
         self.assertEqual(str(app.btn_log_folder.grid_info().get("sticky", "")), "", "not pushed to the right edge")
 
+    def test_mods_table_sorts_by_the_clicked_heading(self):
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        app.tree.delete(*app.tree.get_children())
+        for vals in (("beta", "en", 10, 50, "Traduzido", "x"), ("Alpha", "zh", 2, 5, "Novo (não traduzido)", "x"),
+                     ("gamma", "", 30, 7, "Traduzido pelo jogo", "x"), ("delta", "en", 4, 70, "Traduzido - 2 texto(s) falharam", "x")):
+            app.tree.insert("", "end", values=vals)
+
+        def column(i):
+            return [str(app.tree.item(k, "values")[i]) for k in app.tree.get_children()]
+        app.tree.heading("mod", "command")                                    # the heading is clickable
+        app.sort_by("mod")
+        self.assertEqual(column(0), ["Alpha", "beta", "delta", "gamma"], "A to Z, ignoring upper/lower case")
+        self.assertIn("\u25b2", app.tree.heading("mod")["text"])
+        app.sort_by("mod")
+        self.assertEqual(column(0), ["gamma", "delta", "beta", "Alpha"], "second click: Z to A")
+        self.assertIn("\u25bc", app.tree.heading("mod")["text"])
+        app.sort_by("texts")
+        self.assertEqual(column(2), ["2", "4", "10", "30"], "numbers are sorted as numbers, not as text")
+        self.assertNotIn("\u25b2", app.tree.heading("mod")["text"], "only the sorted column has the arrow")
+        app.sort_by("words")
+        app.sort_by("words")
+        self.assertEqual(column(3), ["70", "50", "7", "5"])
+        app.sort_by("state")
+        self.assertEqual(column(4)[0], "Novo (não traduzido)")
+        self.assertEqual(column(4)[-1], "Traduzido pelo jogo")
+        app.sort_by("state")
+        self.assertEqual(column(4)[0], "Traduzido pelo jogo")
+        app.set_lang("en")                                                      # the arrow survives a change of window language
+        self.assertIn("\u25bc", app.tree.heading("state")["text"])
+
     def test_background_option_is_locked_while_a_translation_runs(self):
         app = self.build(fake_fetcher(release_json("v0.0")))
         self.assertFalse(app.chk_bg.instate(["disabled"]))

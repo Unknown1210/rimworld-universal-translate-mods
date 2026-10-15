@@ -4,6 +4,13 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.024 - 2026-10-15
+- Adicionado: na aba Traduzir mods, ao clicar no título de uma coluna a tabela é ordenada (A a Z ou do menor para o maior) e, ao clicar de novo, na ordem inversa; a coluna ordenada mostra uma seta no título; Textos e Palavras são ordenados como números; a ordem é mantida enquanto a tabela se atualiza e quando o idioma da janela muda.
+- Alterado: o botão "Ver changelog" ficou azul, arredondado e com a mesma altura dos outros botões.
+- Corrigido: o botão verde "Traduzir pendentes" agora usa a altura real dos botões vizinhos (medida depois de aparecer na tela) e preenche toda a altura da fileira, para ficar do mesmo tamanho dos demais.
+- Alterado: os textos das duas opções da aba Início ficaram centralizados dentro dos quadrados (a justificação continua disponível no código).
+- Adicionado: teste novo para a ordenação das colunas.
+
 ## v0.023 - 2026-10-15
 - Alterado: o botão "Traduzir pendentes" (e o "Ir para Traduzir mods" da aba Início) é verde, com cantos arredondados, a mesma letra e a mesma altura dos outros botões, ficando cinza quando não há nada a fazer.
 - Alterado: os textos das duas opções da aba Início ficaram justificados; ao copiar, o texto vai normal, sem espaços especiais nem quebras de linha artificiais.

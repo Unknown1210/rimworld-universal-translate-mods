@@ -19,6 +19,7 @@ from . import __version__, activity, bulk, config, diagnostics, i18n, languages,
 from .paths import data_dir, logs_dir
 
 log = logsetup.get("gui")
+BLUE, BLUE_DARK = "#1565c0", "#0d47a1"                                                   # the "View changelog" button
 ACCENT, ACCENT_DARK, ACCENT_OFF = "#2e7d32", "#1b5e20", "#9aa5a0"          # the "Translate pending" button: green; grey when there is nothing to do
 REPO_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods"
 CHANGELOG_URL = REPO_URL + "/blob/main/CHANGELOG.md"
@@ -507,7 +508,7 @@ class App:
                 frame.columnconfigure(i, weight=1, uniform="btn")
             else:
                 frame.columnconfigure(i, weight=1)
-            b.grid(row=0, column=i, sticky="ew", padx=3)
+            b.grid(row=0, column=i, sticky="nsew" if hasattr(b, "_radius") else "ew", padx=3)         # (the rounded button fills the cell: same height as its neighbours)
 
     def build_home(self):
         ttk, h = self.ttk, self.home
@@ -539,18 +540,18 @@ class App:
         self.card1 = ttk.LabelFrame(cards, padding=10)
         self.card1.grid(row=0, column=0, sticky="nsew")
         self.card1.columnconfigure(0, weight=1)
-        self.lbl_opt1_body = Sel(self.card1, anchor="w", justify="fill")
+        self.lbl_opt1_body = Sel(self.card1, anchor="center", justify="center")
         self.lbl_opt1_body.grid(row=0, column=0, sticky="ew")
-        self.lbl_opt1_note = Sel(self.card1, foreground="#555555", anchor="w", justify="fill")
+        self.lbl_opt1_note = Sel(self.card1, foreground="#555555", anchor="center", justify="center")
         self.lbl_opt1_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         self.lbl_or = ttk.Label(cards, font=("TkDefaultFont", 11, "bold"), foreground="#777777")
         self.lbl_or.grid(row=0, column=1, padx=10)
         self.card2 = ttk.LabelFrame(cards, padding=10)
         self.card2.grid(row=0, column=2, sticky="nsew")
         self.card2.columnconfigure(0, weight=1)
-        self.lbl_opt2_body = Sel(self.card2, anchor="w", justify="fill")
+        self.lbl_opt2_body = Sel(self.card2, anchor="center", justify="center")
         self.lbl_opt2_body.grid(row=0, column=0, sticky="ew")
-        self.lbl_opt2_note = Sel(self.card2, foreground="#555555", anchor="w", justify="fill")
+        self.lbl_opt2_note = Sel(self.card2, foreground="#555555", anchor="center", justify="center")
         self.lbl_opt2_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
         self.btn_go_bulk = rounded_button_class()(self.card2, command=lambda: self.nb.select(self.bulk_tab), fill=ACCENT, dark=ACCENT_DARK, off=ACCENT_OFF)
         self.btn_go_bulk.grid(row=2, column=0, sticky="ew", pady=(10, 0))
@@ -574,7 +575,7 @@ class App:
         row1.grid(row=8, column=0, sticky="ew", pady=3)
         self.btn_check = ttk.Button(row1, command=self.start_check)
         self.btn_apply = ttk.Button(row1, command=self.start_update, state="disabled")
-        self.btn_changelog = ttk.Button(row1, command=lambda: webbrowser.open(CHANGELOG_URL))     # the list of changes is on GitHub, not in the window
+        self.btn_changelog = rounded_button_class()(row1, command=lambda: webbrowser.open(CHANGELOG_URL), fill=BLUE, dark=BLUE_DARK)      # the list of changes is on GitHub, not in the window
         self.stretch(row1, [self.btn_check, self.btn_apply, self.btn_changelog])
         row2 = ttk.Frame(content)
         row2.grid(row=9, column=0, sticky="ew", pady=3)
@@ -598,6 +599,7 @@ class App:
         btns = ttk.Frame(b)
         btns.grid(row=2, column=0, sticky="ew", pady=3)
         self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
+        self.btn_add_dir.bind("<Configure>", lambda e: self.root.after_idle(self.match_button_height))
         self.btn_scan = ttk.Button(btns, command=self.refresh_plan)
         # the main action stands out: a coloured button (a plain tk.Button, because the native ttk buttons of Windows ignore colours)
         self.btn_bulk = rounded_button_class()(btns, command=lambda: self.start_bulk(False), fill=ACCENT, dark=ACCENT_DARK, off=ACCENT_OFF, state="disabled")
@@ -625,6 +627,9 @@ class App:
         sb = ttk.Scrollbar(tf, orient="vertical", command=self.tree.yview)
         sb.grid(row=0, column=1, sticky="ns")
         self.tree.configure(yscrollcommand=sb.set)
+        self.sort_col, self.sort_rev = None, False
+        for c in ("mod", "source", "texts", "words", "state"):
+            self.tree.heading(c, command=lambda col=c: self.sort_by(col))      # click a heading: sort by it; click again: the other way round
         self.tree.bind("<Double-1>", self.on_tree_double)
         self.tree.bind("<Button-1>", self.on_tree_click)
         self.tree.bind("<Motion>", self.on_tree_motion)
@@ -797,8 +802,8 @@ class App:
         """The coloured buttons get the same height as the native buttons around them, so they look like one family."""
         try:
             self.root.update_idletasks()
-            target = self.btn_add_dir.winfo_reqheight()
-            for b in (self.btn_bulk, self.btn_go_bulk):
+            target = max(self.btn_add_dir.winfo_height(), self.btn_add_dir.winfo_reqheight())       # what a native button really measures
+            for b in (self.btn_bulk, self.btn_go_bulk, self.btn_changelog):
                 b.configure(height=target)
         except Exception:  # noqa: BLE001
             log.exception("could not match the button heights")
@@ -854,10 +859,12 @@ class App:
         self.bulk_hint.set_key("det_hint")
         self.update_bulk_buttons()
         self.render_dirs()
+        self.col_titles = {"mod": t("col_mod"), "source": t("col_source"), "texts": t("col_texts"), "words": t("col_words"),
+                           "state": t("col_state"), "folder": t("col_folder")}
         for col, key in (("mod", "col_mod"), ("source", "col_source"), ("texts", "col_texts"), ("words", "col_words"),
                          ("state", "col_state"), ("folder", "col_folder")):
             self.tree.heading(col, text=t(key), anchor="center")
-        fit_columns(self.tree)
+        self.update_sort_headings()
         for f in self.fields:
             f.render()
         self.set_lang_choices(list(self.lang_codes.values()) or SUPPORTED_TARGETS)
@@ -1339,6 +1346,7 @@ class App:
             if live and time.time() - live["last"] < self.GAME_RECENT_S:
                 again = True                               # come back to flip "translating" into "translated" when the game goes quiet
         self.update_summary()
+        self.apply_sort()
         if again:
             self._live_job = self.root.after(3000, self.refresh_live_rows)
 
@@ -1353,6 +1361,42 @@ class App:
                 pass
         pend = sum(1 for _m, s, _r in self.plan_rows if s != "ok")
         self.bulk_summary.set_key("bulk_summary", mods=len(self.plan_rows), pending=pend, texts=texts, words=words)
+
+    NUMERIC_COLS = ("texts", "words")
+
+    def sort_by(self, col):
+        if self.sort_col == col:
+            self.sort_rev = not self.sort_rev
+        else:
+            self.sort_col, self.sort_rev = col, False
+        self.apply_sort()
+        self.update_sort_headings()
+
+    def apply_sort(self):
+        """Order the rows by the chosen column (A to Z / small to large, or the reverse). Called again after the rows change."""
+        if not self.sort_col:
+            return
+        idx = ("mod", "source", "texts", "words", "state", "folder").index(self.sort_col)
+
+        def key(iid):
+            v = self.tree.item(iid, "values")[idx]
+            if self.sort_col in self.NUMERIC_COLS:
+                try:
+                    return (0, float(v), "")
+                except (TypeError, ValueError):
+                    return (0, 0.0, "")
+            return (0, 0.0, str(v).casefold())
+        items = sorted(self.tree.get_children(), key=key, reverse=self.sort_rev)
+        for i, iid in enumerate(items):
+            self.tree.move(iid, "", i)
+
+    def update_sort_headings(self):
+        """The heading of the sorted column shows an arrow (up = A to Z, down = Z to A)."""
+        titles = getattr(self, "col_titles", {})
+        for col, title in titles.items():
+            arrow = (" \u25bc" if self.sort_rev else " \u25b2") if col == self.sort_col else ""
+            self.tree.heading(col, text=title + arrow)
+        fit_columns(self.tree)
 
     def render_rows(self):
         self.tree.delete(*self.tree.get_children())
