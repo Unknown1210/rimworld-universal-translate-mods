@@ -4,6 +4,13 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.029 - 2026-10-15
+- Corrigido: o nome da janela em francês (e de outros idiomas) aparecia com "&#160;"; sequências desse tipo agora viram o caractere real, também nos textos já salvos.
+- Alterado: tcheco, dinamarquês, húngaro e polonês não aparecem mais como idioma da janela nem como idioma de destino, porque não existe modelo de tradução do inglês para eles que o programa consiga usar.
+- Adicionado: mensagem clara na janela quando um idioma não tem modelo de tradução, no lugar do erro técnico.
+- Alterado: o README (português e inglês) agora diz que são 26 dos 30 idiomas do RimWorld e explica por que esses quatro não aparecem.
+- Adicionado: testes novos para as entidades HTML nos textos traduzidos e para os idiomas sem modelo.
+
 ## v0.028 - 2026-10-15
 - Alterado: na lista de mods do menu do mod, a descrição agora fica na mesma linha do título ("Mods (51): Só os textos que ainda não têm tradução são traduzidos."), e a lista ganhou um pouco de altura.
 - Alterado: os nomes das opções de tradução ficaram mais curtos e cabem nos botões: "Tradução do próprio mod", "Tradução de outro mod" e "Sempre a automática".

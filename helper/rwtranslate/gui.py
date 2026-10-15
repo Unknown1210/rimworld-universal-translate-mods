@@ -923,6 +923,9 @@ class App:
             if err is not None:
                 log.warning("window texts for %s not prepared: %s", src, err)
                 reason = " ".join(str(err).split())
+                if reason.startswith("no model path"):                      # this language has no translation model at all: say so plainly
+                    self.lbl_ui_note.configure(text=i18n.tr(self.lang, "ui_no_model"))
+                    return
                 self.lbl_ui_note.configure(text=i18n.tr(self.lang, "ui_prepare_failed", err=(reason[:70] + "...") if len(reason) > 70 else reason))
                 return
             self.lbl_ui_note.configure(text="")

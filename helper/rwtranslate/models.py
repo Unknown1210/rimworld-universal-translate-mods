@@ -58,6 +58,8 @@ def unsupported_marker(src, tgt):
 def is_unsupported(src, tgt):
     """True for a pair whose package format this engine cannot use (known list, or found out after a download)."""
     src, tgt = languages.model_code(src), languages.model_code(tgt)
+    if src == PIVOT and tgt in languages.NO_ENGLISH_MODEL:
+        return True
     return (src, tgt) in BPE_ONLY or unsupported_marker(src, tgt).exists()
 
 

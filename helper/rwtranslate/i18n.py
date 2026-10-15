@@ -7,7 +7,7 @@ from .paths import data_dir  # noqa: F401  (tests reach the data dir through thi
 # hand; every other one is machine-translated from the English texts on first use (see uitext.py) and cached.
 GAME_LANGS = ["ca", "zh", "zh-Hant", "cs", "da", "nl", "en", "et", "fi", "fr", "de", "el", "hu", "it", "ja", "ko", "ko-FC", "nb",
               "pl", "pt-PT", "pt-BR", "ro", "ru", "sk", "es", "es-419", "sv", "tr", "uk", "vi"]
-UI_LANGS = tuple(GAME_LANGS)
+UI_LANGS = tuple(c for c in GAME_LANGS if c not in languages.NO_ENGLISH_MODEL)      # (no usable model: not offered)
 HANDWRITTEN = ("pt", "en")
 
 TEXT = {
@@ -49,6 +49,7 @@ TEXT = {
         "restart_note": "Se você traduzir ou atualizar os mods com o jogo aberto e não vir a tradução aplicada, reinicie o jogo.",
         "ui_lang": "Idioma da janela:",
         "ui_preparing": "Preparando...",
+        "ui_no_model": "Não existe modelo de tradução para este idioma: a janela continua em inglês.",
         "ui_prepare_failed": "Não deu para preparar este idioma: {err}",
         "check_failed": "Não foi possível verificar: {err}",
         "new_version": "Nova versão disponível: {latest} (você tem {current}).",
@@ -204,6 +205,7 @@ TEXT = {
         "restart_note": "If you translate or update mods while the game is open and you do not see the translation applied, restart the game.",
         "ui_lang": "Window language:",
         "ui_preparing": "Preparing...",
+        "ui_no_model": "There is no translation model for this language: the window stays in English.",
         "ui_prepare_failed": "Could not prepare this language: {err}",
         "check_failed": "Could not check: {err}",
         "new_version": "New version available: {latest} (you have {current}).",
@@ -378,7 +380,7 @@ def tr(_ui, key, **kw):
 
 # Target languages offered in the window: the ones that have a translation model (checked against the live Argos index
 # when it can be reached; this is the list as of the last check). Portuguese is split into Brazil and Portugal.
-SUPPORTED_TARGETS = list(GAME_LANGS)
+SUPPORTED_TARGETS = list(UI_LANGS)
 
 # Language names: code -> (English, Portuguese, native), as RimWorld's own language list names them.
 NAMES = {

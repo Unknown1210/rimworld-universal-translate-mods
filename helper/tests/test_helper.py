@@ -279,8 +279,13 @@ class WindowLanguages(unittest.TestCase):
         uitext.forget()
 
     def test_the_window_offers_exactly_the_rimworld_languages(self):
-        self.assertEqual(len(self.i18n.UI_LANGS), 30)
-        self.assertEqual(set(self.i18n.UI_LANGS), set(self.i18n.NAMES))
+        self.assertEqual(len(self.i18n.UI_LANGS), 26)                                    # the 30 of RimWorld minus the 4 with no usable model
+        self.assertEqual(set(self.i18n.UI_LANGS), set(self.i18n.NAMES) - languages.NO_ENGLISH_MODEL)
+        for c in ("cs", "da", "hu", "pl"):
+            self.assertNotIn(c, self.i18n.UI_LANGS)
+            self.assertNotIn(c, self.i18n.SUPPORTED_TARGETS)
+            self.assertTrue(models_mod.is_unsupported("en", c))
+            self.assertNotIn(c, models_mod.available_targets([{"from_code": "en", "to_code": c}]))
         self.assertEqual(self.i18n.SUPPORTED_TARGETS, list(self.i18n.UI_LANGS))
         for c in ("ca", "zh", "zh-Hant", "ko-FC", "nb", "es-419", "pt-PT", "pt-BR", "vi", "uk"):
             self.assertIn(c, self.i18n.UI_LANGS)
@@ -325,6 +330,13 @@ class WindowLanguages(unittest.TestCase):
         self.uitext.forget()
         self.assertEqual(self.uitext.pending("de"), [])
         self.assertEqual(self.uitext.translate_missing("de"), 0)
+
+    def test_html_entities_from_a_translation_become_real_characters(self):
+        set_engine("en", "it", type("E", (), {"translate_batch": staticmethod(lambda ts: ["Langue&#160;:" for _ in ts])})())
+        self.uitext.translate_missing("it")
+        self.assertEqual(self.i18n.tr("it", "ui_lang"), "Langue\xa0:")
+        self.assertIn("ui_no_model", self.i18n.TEXT["pt"])
+        self.assertIn("ui_no_model", self.i18n.TEXT["en"])
 
     def test_a_careless_engine_cannot_break_placeholders(self):
         set_engine("en", "fr", type("E", (), {"translate_batch": staticmethod(lambda ts: ["x" for _ in ts])})())

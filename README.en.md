@@ -10,12 +10,12 @@
 
 <div align="justify">
 
-**Current version: 0.028** · [Download from the Releases tab](../../releases/latest)
+**Current version: 0.029** · [Download from the Releases tab](../../releases/latest)
 
 Translates the other mods in your game into your language **automatically**, **without needing a translation mod for each mod**.
 The translation runs **on your computer and for free**. After the model for your language is downloaded once, **no internet is needed**. Every translation is saved, so it is only done once.
 
-> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.028). See "Current status" below.
+> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.029). See "Current status" below.
 
 <h2 align="left">Compatibility</h2>
 
@@ -23,7 +23,7 @@ The translation runs **on your computer and for free**. After the model for your
 <tr><td width="22%"><b>Game</b></td><td align="justify">RimWorld <b>1.6</b> and <b>1.7</b> (1.7 is still in beta)</td></tr>
 <tr><td width="22%"><b>System</b></td><td align="justify"><b>Windows</b> 10/11</td></tr>
 <tr><td width="22%"><b>Original language of the mods</b></td><td align="justify"><b>Any</b>: the mod detects it by itself (English, Chinese, Russian, Portuguese, ...)</td></tr>
-<tr><td width="22%"><b>Target language</b></td><td align="justify"><b>Only the 30 languages RimWorld itself offers</b>: Catalan, Chinese (Simplified), Chinese (Traditional), Czech, Danish, Dutch, English, Estonian, Finnish, French, German, Greek, Hungarian, Italian, Japanese, Korean, Korean (Fast Channel), Norwegian (Bokmål), Polish, Portuguese (Brazil), Portuguese (Portugal), Romanian, Russian, Slovak, Spanish (Castilian), Spanish (Latin America), Swedish, Turkish, Ukrainian and Vietnamese. Any other language is not offered. Each one has its own translation model, checked against the Argos Translate model list (the Spanish and Korean variants share one model), downloaded on demand.</td></tr>
+<tr><td width="22%"><b>Target language</b></td><td align="justify"><b>Only the RimWorld languages that have a usable translation model (26 of the 30)</b>: Catalan, Chinese (Simplified), Chinese (Traditional), Dutch, English, Estonian, Finnish, French, German, Greek, Italian, Japanese, Korean, Korean (Fast Channel), Norwegian (Bokmål), Portuguese (Brazil), Portuguese (Portugal), Romanian, Russian, Slovak, Spanish (Castilian), Spanish (Latin America), Swedish, Turkish, Ukrainian and Vietnamese. Czech, Danish, Hungarian and Polish are not offered: there is no translation model for them that this program can use. Any other language is not offered either. Each one has its own translation model, checked against the Argos Translate model list (the Spanish and Korean variants share one model), downloaded on demand.</td></tr>
 </table>
 
 
@@ -124,7 +124,7 @@ With RimWorld's **developer mode** on, the game itself marks the texts that have
 
 <h2 align="left">Current status (transparency)</h2>
 
-This is an **early version** (current version 0.028), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
+This is an **early version** (current version 0.029), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
 
 <h2 align="left">Problem or conflict with a mod?</h2>
 

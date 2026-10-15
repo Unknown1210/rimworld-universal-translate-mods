@@ -203,10 +203,10 @@ class Window(unittest.TestCase):
         from rwtranslate import i18n
         app = self.build(fake_fetcher(release_json("v0.0")))
         values = set(app.ui_box.cget("values"))
-        self.assertEqual(len(values), 30)
+        self.assertEqual(len(values), 26)          # RimWorld's 30 minus Czech, Danish, Hungarian and Polish (no usable model)
         self.assertIn("Deutsch", values)
         self.assertIn("Português (Brasil)", values)
-        self.assertEqual(set(app.lang_codes.values()), set(i18n.SUPPORTED_TARGETS))     # the target list is the same 30
+        self.assertEqual(set(app.lang_codes.values()), set(i18n.SUPPORTED_TARGETS))     # the target list is the same 26
         from rwtranslate import gui
         self.assertGreaterEqual(int(str(app.ui_box.cget("width"))), max(len(v) for v in values))     # no name is cut off
         self.assertGreater(gui.fit_width(["简体中文"]), gui.fit_width(["abcd"]) - 1)                     # wide letters count double

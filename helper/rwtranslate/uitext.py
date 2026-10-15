@@ -4,6 +4,7 @@ The English texts are translated with the program's own offline models on first 
 one entry per text together with a hash of the English text it came from (a changed English text is translated again).
 Until a text is ready the window shows it in English; nothing here ever blocks or breaks the window."""
 import hashlib
+import html
 import json
 import re
 import threading
@@ -38,6 +39,11 @@ def _read(lang):
     return raw if isinstance(raw, dict) else {}
 
 
+def _clean(text):
+    """A machine translation sometimes comes back with HTML entities ("&#160;" for a non-breaking space): show the real character."""
+    return html.unescape(text) if "&" in text else text
+
+
 def load(lang):
     """{key: translation} for the entries that still match the current English text."""
     with _lock:
@@ -46,7 +52,7 @@ def load(lang):
             ok = {}
             for k, v in _read(lang).items():
                 if k in en and isinstance(v, list) and len(v) == 2 and v[0] == _h(en[k]) and isinstance(v[1], str) and v[1]:
-                    ok[k] = v[1]
+                    ok[k] = _clean(v[1])
             _memo[lang] = ok
         return _memo[lang]
 
@@ -83,7 +89,7 @@ def translate_missing(lang, progress=None):
     n = 0
     for i, k in enumerate(todo):
         try:
-            t = clean_output(en[k], translate_protected(en[k], engine.translate_batch), lang)
+            t = _clean(clean_output(en[k], translate_protected(en[k], engine.translate_batch), lang))
         except Exception:  # noqa: BLE001
             log.exception("could not translate window text %s into %s", k, lang)
             continue

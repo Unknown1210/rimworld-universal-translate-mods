@@ -33,9 +33,14 @@ GAME_LANGUAGES = {
 
 
 # Argos models "English -> X" that exist (checked in the Argos index; the window languages and the target languages must all be here).
-ARGOS_FROM_ENGLISH = frozenset({"ar", "az", "bg", "bn", "ca", "cs", "da", "de", "el", "eo", "es", "et", "eu", "fa", "fi", "fr", "ga", "gl", "he",
-                                "hi", "hu", "id", "it", "ja", "ko", "ky", "lt", "lv", "ms", "nb", "nl", "pb", "pl", "pt", "ro", "ru", "sk", "sl",
+ARGOS_FROM_ENGLISH = frozenset({"ar", "az", "bg", "bn", "ca", "de", "el", "eo", "es", "et", "eu", "fa", "fi", "fr", "ga", "gl", "he",
+                                "hi", "id", "it", "ja", "ko", "ky", "lt", "lv", "ms", "nb", "nl", "pb", "pt", "ro", "ru", "sk", "sl",
                                 "sq", "sv", "sw", "th", "tl", "tr", "uk", "ur", "vi", "zh", "zt"})
+
+
+# English -> X models that cannot be used: the package is missing from the Argos index (Danish, Hungarian), or it uses a tokenizer
+# format this program cannot read (Czech, Polish). Confirmed by running them. These languages are not offered as a target or a window language.
+NO_ENGLISH_MODEL = frozenset({"cs", "da", "hu", "pl"})
 
 
 # Target languages with regional variants. RimWorld has two Portuguese languages (folders "Portuguese" = Portugal and
