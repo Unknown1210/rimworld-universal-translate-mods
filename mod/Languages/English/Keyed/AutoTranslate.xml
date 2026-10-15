@@ -13,6 +13,9 @@
   <AT_TargetFromHelper>Translating into: {0} (chosen in the translator program).</AT_TargetFromHelper>
   <AT_TargetFromGame>Translating into: {0} (the game's language). Choose another one in the translator program.</AT_TargetFromGame>
   <AT_TargetNone>No target language yet: choose one in the translator program.</AT_TargetNone>
+  <AT_BtnLang>Language: {0}  (click to choose)</AT_BtnLang>
+  <AT_LangAuto>Automatic (the one chosen in the translator program)</AT_LangAuto>
+  <AT_LangAutoShort>automatic</AT_LangAutoShort>
   <AT_ApplyOnClose>Changes apply when you close this window.</AT_ApplyOnClose>
   <AT_HelperProblem>Translator program: {0}</AT_HelperProblem>
   <AT_Search>Search mods:</AT_Search>

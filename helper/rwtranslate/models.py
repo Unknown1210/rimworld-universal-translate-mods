@@ -47,9 +47,23 @@ def load_index(force=False):
     return data
 
 
+# Argos packages that ship a subword-nmt "bpe.model" (Moses tokenizer + BPE) instead of a SentencePiece model: this engine cannot read them.
+BPE_ONLY = {("hu", "en"), ("cs", "en"), ("en", "pl")}
+
+
+def unsupported_marker(src, tgt):
+    return models_dir() / f"{src}_{tgt}.unsupported"
+
+
+def is_unsupported(src, tgt):
+    """True for a pair whose package format this engine cannot use (known list, or found out after a download)."""
+    src, tgt = languages.model_code(src), languages.model_code(tgt)
+    return (src, tgt) in BPE_ONLY or unsupported_marker(src, tgt).exists()
+
+
 def available_pairs(index=None):
     index = index if index is not None else load_index()
-    return sorted({(p["from_code"], p["to_code"]) for p in index})
+    return sorted({(p["from_code"], p["to_code"]) for p in index if not is_unsupported(p["from_code"], p["to_code"])})
 
 
 def available_targets(index=None):
@@ -171,6 +185,13 @@ def _install_pair(src, tgt, progress, index):
             tmp.unlink()
         shutil.rmtree(dest, ignore_errors=True)  # never leave a half-installed model
         raise
+    model_bin, enc, _dec = find_model_files(dest)
+    if model_bin is None or enc is None:                  # e.g. a bpe.model package: remember it, never download or retry it
+        what = listing(dest)
+        shutil.rmtree(dest, ignore_errors=True)
+        unsupported_marker(src, tgt).write_text(what)
+        log.warning("model %s->%s uses a tokenizer format this program cannot read; marked unsupported. Contents: %s", src, tgt, what)
+        raise RuntimeError(f"model {src}->{tgt} has an unsupported tokenizer format (the folder had: {what})")
     (dest / "ok").write_text(str(pkg["package_version"]))
     log.info("model %s->%s installed (%d files)", src, tgt, sum(1 for _ in dest.rglob("*")))
     progress("Modelo instalado.")

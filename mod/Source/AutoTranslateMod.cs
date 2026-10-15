@@ -52,6 +52,26 @@ namespace AutoTranslate
             return T.Get(LangMap.ConfigTarget() != null ? "AT_TargetFromHelper" : "AT_TargetFromGame", LangNames.Label(t));
         }
 
+        /// <summary>Button after the "Translating into ..." line: pick the language from those the translator program has already translated into.</summary>
+        static void LanguageButton(Listing_Standard l)
+        {
+            List<string> cached = LangMap.CachedLanguages();
+            if (cached.Count == 0) return;
+            string how;
+            string current = Pipeline.Target ?? LangMap.ResolveTarget("auto", out how);
+            bool manual = !string.Equals(Settings.language, "auto", StringComparison.OrdinalIgnoreCase);
+            string caption = T.Get("AT_BtnLang", current == null ? "-" : LangNames.Label(current)) + (manual ? "" : " (" + T.Get("AT_LangAutoShort") + ")");
+            if (!l.ButtonText(caption)) return;
+            var opts = new List<FloatMenuOption>();
+            opts.Add(new FloatMenuOption(T.Get("AT_LangAuto"), () => Settings.language = "auto"));
+            foreach (string code in cached)
+            {
+                string c = code;
+                opts.Add(new FloatMenuOption(LangNames.Label(c), () => Settings.language = c));
+            }
+            Find.WindowStack.Add(new FloatMenu(opts));
+        }
+
         public override void DoSettingsWindowContents(Rect inRect)
         {
             try
@@ -95,6 +115,7 @@ namespace AutoTranslate
                     status += "\n" + T.Get("AT_HelperProblem", err);
                 }
                 l.Label(status);
+                LanguageButton(l);
                 int problems = 0;
                 foreach (ModState pm in Pipeline.Mods) if (pm.AutoDisabled) problems++;
                 if (problems > 0) l.Label("<color=#ff6666>" + T.Get("AT_Banner", problems) + "</color>");

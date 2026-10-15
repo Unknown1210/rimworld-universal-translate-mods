@@ -4,6 +4,19 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.025 - 2026-10-15
+- Adicionado: no menu do mod, um botão depois de "traduzindo para ..." para escolher o idioma entre os que já têm tradução feita pelo programa (ou voltar para automático).
+- Alterado: a tradução em lote ficou mais rápida: todos os textos de um pedido vão ao modelo numa só chamada e o uso de processador subiu.
+- Alterado: o modelo agora trabalha em blocos pequenos de frases, e o botão Parar é verificado entre os blocos, parando bem mais rápido.
+- Corrigido: saídas repetitivas ("相相相…") e muito lentas; o tamanho máximo da resposta acompanha o tamanho da frase, há penalidade de repetição, loops são detectados e refeitos e, se continuarem, a frase original é mantida.
+- Corrigido: o idioma polonês (pacote en→pl com tokenizador não suportado) e outros pacotes parecidos não são mais oferecidos nem baixados em repetição; o pacote é marcado como não suportado uma única vez.
+- Corrigido: textos em inglês detectados como tcheco ou húngaro (lista de palavras menor, em Python e no mod); modelos tcheco/húngaro→inglês não são mais tentados.
+- Corrigido: uma pasta de modelo não é mais apagada quando o carregamento falha.
+- Corrigido: quando o jogo fecha a conexão antes da resposta, o programa registra um aviso em vez de um erro grave.
+- Corrigido: quando não há modelo utilizável, o grupo falha uma vez, em vez de um erro por texto.
+- Alterado: todos os botões do programa ficaram arredondados e com altura fixa.
+- Adicionado: testes novos para lote único, pacotes não suportados, loops do modelo, blocos e parada.
+
 ## v0.024 - 2026-10-15
 - Adicionado: na aba Traduzir mods, ao clicar no título de uma coluna a tabela é ordenada (A a Z ou do menor para o maior) e, ao clicar de novo, na ordem inversa; a coluna ordenada mostra uma seta no título; Textos e Palavras são ordenados como números; a ordem é mantida enquanto a tabela se atualiza e quando o idioma da janela muda.
 - Alterado: o botão "Ver changelog" ficou azul, arredondado e com a mesma altura dos outros botões.

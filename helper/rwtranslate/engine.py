@@ -25,6 +25,32 @@ _ARTICLES = {
 }
 
 
+_local = threading.local()
+CHUNK_SENTENCES = 12          # sentences per model call: the stop button / a game request waits at most one chunk
+CHUNK_TOKENS = 1500           # ...or this many source tokens, whichever comes first
+
+
+class Cancelled(Exception):
+    """The bulk run was stopped by the user while the model was working."""
+
+
+def set_cancel(event):
+    """Make model calls made by THIS thread stop between chunks when `event` is set (None = no cancel)."""
+    _local.cancel = event
+
+
+def degenerate(src_tokens, out):
+    """True when a model answer is a loop ("相相相相...", the same word again and again) or absurdly longer than its source."""
+    if not out:
+        return False
+    if re.search(r"(.)\1{5,}", out):
+        return True
+    toks = out.split()
+    if len(toks) >= 8 and len(set(toks)) * 3 <= len(toks):
+        return True
+    return len(out) > 12 * max(len(src_tokens), 4) + 40
+
+
 def _norm_text(t):
     return " ".join(t.lower().split())
 
@@ -88,6 +114,12 @@ class EchoEngine:
         return [f"{t} ({self.target})" for t in texts]
 
 
+def _default_threads():
+    """CTranslate2 uses only 4 threads unless told otherwise; use about half of the logical processors (the game keeps the rest)."""
+    import os
+    return max(2, min(8, (os.cpu_count() or 4) // 2))
+
+
 class CT2Engine:
     name = "ctranslate2"
 
@@ -109,7 +141,7 @@ class CT2Engine:
         self._lock = threading.Lock()
         try:
             self._tr = ctranslate2.Translator(str(model_bin.parent), device="cpu",
-                                              inter_threads=1, intra_threads=threads)
+                                              inter_threads=1, intra_threads=threads or _default_threads())
             self._sp = sentencepiece.SentencePieceProcessor(model_file=str(sp))
             self._sp_out = self._sp if sp_out == sp else sentencepiece.SentencePieceProcessor(model_file=str(sp_out))
         except Exception as e:
@@ -138,9 +170,41 @@ class CT2Engine:
 
     def _run(self, sentences):
         tokens = [self._sp.encode(s, out_type=str) for s in sentences]
+        outs = [None] * len(sentences)
+        order = sorted(range(len(sentences)), key=lambda i: len(tokens[i]))    # similar lengths together: little padding
+        chunk, size = [], 0
+        for i in order + [None]:
+            if i is not None:
+                chunk.append(i)
+                size += len(tokens[i])
+            if chunk and (i is None or len(chunk) >= CHUNK_SENTENCES or size >= CHUNK_TOKENS):
+                cancel = getattr(_local, "cancel", None)
+                if cancel is not None and cancel.is_set():
+                    raise Cancelled()
+                self._run_chunk(chunk, tokens, sentences, outs)
+                chunk, size = [], 0
+        return outs
+
+    def _translate(self, toks, **kw):
+        longest = max(len(t) for t in toks)
         with self._lock:
-            results = self._tr.translate_batch(tokens, beam_size=4, max_decoding_length=512)
-        return [detokenize(self._sp_out, r.hypotheses[0]) for r in results]
+            return self._tr.translate_batch(toks, max_decoding_length=min(512, 2 * longest + 16), **kw)
+
+    def _run_chunk(self, idx, tokens, sentences, outs):
+        results = self._translate([tokens[i] for i in idx], beam_size=4, repetition_penalty=1.1)
+        bad = []
+        for i, r in zip(idx, results):
+            o = detokenize(self._sp_out, r.hypotheses[0])
+            outs[i] = o
+            if degenerate(tokens[i], o):
+                bad.append(i)
+        for i in bad:                       # one more try, alone and with stricter anti-loop settings
+            r = self._translate([tokens[i]], beam_size=2, repetition_penalty=1.4, no_repeat_ngram_size=3)[0]
+            o = detokenize(self._sp_out, r.hypotheses[0])
+            if degenerate(tokens[i], o):
+                log.warning("model looped on a sentence; keeping the original: %r", sentences[i][:120])
+                o = sentences[i]
+            outs[i] = o
 
 
 class PivotEngine:
@@ -165,10 +229,7 @@ def _load(src, tgt):
         try:
             _engines[key] = CT2Engine(folder, family=languages.family(tgt))
         except EngineError as e:
-            if "model files not found" in str(e):
-                import shutil
-                shutil.rmtree(folder, ignore_errors=True)       # a broken install is removed: the next try downloads the model again
-                log.warning("removed the incomplete model folder %s", folder)
+            log.error("model %s could not be loaded: %s", folder.name, e)
             raise
     return _engines[key]
 

@@ -11,10 +11,10 @@ _STOP = {k: set(v.split()) for k, v in {
     "de": "der die und in den von zu das mit sich des auf für ist im dem nicht ein eine als auch es an werden aus er hat dass sie nach wird bei einer um am sind noch wie",
     "it": "di e il la che è per un in con non una sono le da del della si dei più come ma al ho gli lo anche questo nel alla",
     "nl": "de van het een en in is dat op te zijn voor met die niet aan er maar om ook als bij of uit",
-    "pl": "i w nie na się z do to że jest jak po co ale za od przez czy dla tak już",
+    "pl": "w nie na się z że jest jak po co ale za od przez czy dla tak już",
     "tr": "ve bir bu için ile da de çok olarak daha gibi en ama ne kadar",
-    "cs": "a se na je že s v to z do o ale pro jako by si",
-    "hu": "a az és hogy nem is egy meg de van",
+    "cs": "se na je že v z ale pro jako si",
+    "hu": "az és hogy nem egy meg van",
     "sv": "och i att det som en på är av för med till den har",
 }.items()}
 

@@ -19,8 +19,6 @@ from . import __version__, activity, bulk, config, diagnostics, i18n, languages,
 from .paths import data_dir, logs_dir
 
 log = logsetup.get("gui")
-BLUE, BLUE_DARK = "#1565c0", "#0d47a1"                                                   # the "View changelog" button
-ACCENT, ACCENT_DARK, ACCENT_OFF = "#2e7d32", "#1b5e20", "#9aa5a0"          # the "Translate pending" button: green; grey when there is nothing to do
 REPO_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods"
 CHANGELOG_URL = REPO_URL + "/blob/main/CHANGELOG.md"
 ISSUES_URL = "https://github.com/Unknown1210/rimworld-universal-translate-mods/issues/new?labels=bug"
@@ -275,11 +273,19 @@ def fit_columns(tree):
 
 _ROUNDED = None
 
+# Colours of the buttons: (fill, border, text, hover fill, hover border, pressed fill, disabled fill, disabled border, disabled text)
+BUTTON_STYLES = {
+    "neutral": ("#fdfdfd", "#adadad", "#1a1a1a", "#e5f1fb", "#0078d4", "#cce4f7", "#f3f3f3", "#d4d4d4", "#a0a0a0"),
+    "green": ("#2e7d32", "#1b5e20", "#ffffff", "#27692b", "#1b5e20", "#1b5e20", "#9aa5a0", "#8a9590", "#eeeeee"),
+    "blue": ("#1565c0", "#0d47a1", "#ffffff", "#1257a6", "#0d47a1", "#0d47a1", "#9aa5b5", "#8a95a5", "#eeeeee"),
+}
+
 
 def rounded_button_class():
-    """A coloured button with rounded corners, drawn on a canvas (the native Windows buttons are rounded, and a plain tk.Button cannot be
-    coloured AND rounded). Same height and font as the ttk buttons around it (see App.match_button_height); behaves like a button:
-    configure(text=, state=, bg=), cget, invoke(), hover and pressed looks, Space/Enter when focused."""
+    """Every button of the window: rounded corners, ONE fixed height for all of them (so a coloured button is never taller or shorter
+    than its neighbours), drawn on a canvas. The native Windows buttons can not be coloured, and mixing native and drawn buttons made
+    their heights differ. behaves like a button: configure(text=, state=, command=), cget, invoke(), hover / pressed / disabled looks,
+    Space or Enter when focused. style: "neutral" (light grey), "green" (main action) or "blue" (link)."""
     global _ROUNDED
     if _ROUNDED is not None:
         return _ROUNDED
@@ -287,11 +293,12 @@ def rounded_button_class():
     from tkinter import font as tkfont, ttk
 
     class RoundedButton(tk.Canvas):
-        def __init__(self, parent, text="", command=None, fill="#2e7d32", dark="#1b5e20", off="#9aa5a0", fg="white", radius=5, state="normal"):
+        def __init__(self, parent, text="", command=None, style="neutral", state="normal", radius=5, **_ignored):
             bg = ttk.Style().lookup("TFrame", "background") or parent.winfo_toplevel().cget("background")
-            super().__init__(parent, height=24, width=60, highlightthickness=0, bd=0, background=bg, cursor="hand2", takefocus=1)
             self._font = tkfont.nametofont("TkDefaultFont")
-            self._text, self._command, self._fill, self._dark, self._off, self._fg = text, command, fill, dark, off, fg
+            h = self._font.metrics("linespace") + 14                       # the same for every button
+            super().__init__(parent, height=h, width=60, highlightthickness=0, bd=0, background=bg, cursor="hand2", takefocus=1)
+            self._text, self._command, self._style = text, command, style
             self._radius, self._state, self._hover, self._down = radius, state, False, False
             self.bind("<Configure>", lambda e: self._draw())
             self.bind("<Enter>", lambda e: self._set_hover(True))
@@ -328,16 +335,20 @@ def rounded_button_class():
 
         def _draw(self):
             self.delete("all")
-            w, h = max(self.winfo_width(), int(self.cget("width"))), max(self.winfo_height(), int(self.cget("height")))
-            if self.winfo_width() > 1:
-                w = self.winfo_width()
+            fill, border, fg, hfill, hborder, dfill, disfill, disborder, disfg = BUTTON_STYLES.get(self._style, BUTTON_STYLES["neutral"])
+            if self._state != "normal":
+                fill, border, fg = disfill, disborder, disfg
+            elif self._down:
+                fill, border = dfill, hborder
+            elif self._hover:
+                fill, border = hfill, hborder
+            w = self.winfo_width() if self.winfo_width() > 1 else int(self.cget("width"))
+            h = self.winfo_height() if self.winfo_height() > 1 else int(self.cget("height"))
             r = self._radius
-            fill = self._off if self._state != "normal" else (self._dark if (self._hover or self._down) else self._fill)
             x1, y1, x2, y2 = 0, 0, w - 1, h - 1
             pts = [x1 + r, y1, x2 - r, y1, x2, y1, x2, y1 + r, x2, y2 - r, x2, y2, x2 - r, y2, x1 + r, y2, x1, y2, x1, y2 - r, x1, y1 + r, x1, y1]
-            self.create_polygon(pts, smooth=True, fill=fill, outline=self._dark if self._state == "normal" else "#8a9590")
-            self.create_text(w / 2, h / 2 + (1 if self._down else 0), text=self._text, fill=self._fg if self._state == "normal" else "#eeeeee",
-                             font=self._font)
+            self.create_polygon(pts, smooth=True, fill=fill, outline=border)
+            self.create_text(w / 2, h / 2 + (1 if self._down else 0), text=self._text, fill=fg, font=self._font)
 
         def configure(self, cnf=None, **kw):
             if cnf:
@@ -350,15 +361,11 @@ def rounded_button_class():
                 self._hover = False
             if "command" in kw:
                 self._command = kw.pop("command")
-            if "bg" in kw:                                    # the colour of the button: green when it can be used
-                new = kw.pop("bg")
-                if new != self._off:
-                    self._fill = new
-            for k in ("pady", "padx", "fg", "activebackground", "activeforeground", "disabledforeground", "relief", "bd", "cursor",
-                      "highlightthickness", "highlightbackground", "highlightcolor", "font"):
+            if "style" in kw:
+                self._style = kw.pop("style")
+            for k in ("bg", "pady", "padx", "fg", "activebackground", "activeforeground", "disabledforeground", "relief", "bd", "cursor",
+                      "highlightthickness", "highlightbackground", "highlightcolor", "font", "height"):
                 kw.pop(k, None)
-            if "height" in kw:
-                super().configure(height=kw.pop("height"))
             if kw:
                 super().configure(**kw)
             self._draw()
@@ -374,6 +381,11 @@ def rounded_button_class():
 
     _ROUNDED = RoundedButton
     return _ROUNDED
+
+
+def Btn(parent, **kw):
+    """A window button (see rounded_button_class)."""
+    return rounded_button_class()(parent, **kw)
 
 
 def enable_copy(tree):
@@ -508,7 +520,7 @@ class App:
                 frame.columnconfigure(i, weight=1, uniform="btn")
             else:
                 frame.columnconfigure(i, weight=1)
-            b.grid(row=0, column=i, sticky="nsew" if hasattr(b, "_radius") else "ew", padx=3)         # (the rounded button fills the cell: same height as its neighbours)
+            b.grid(row=0, column=i, sticky="ew", padx=3)
 
     def build_home(self):
         ttk, h = self.ttk, self.home
@@ -527,7 +539,7 @@ class App:
         self.lang_box = ttk.Combobox(row, width=30, state="readonly")
         self.lang_box.grid(row=0, column=1, padx=(0, 6))
         self.lang_box.bind("<<ComboboxSelected>>", self.on_target_selected)
-        self.btn_model = ttk.Button(row, command=self.install_model)
+        self.btn_model = Btn(row, command=self.install_model)
         self.btn_model.grid(row=0, column=2)
         self.target_msg = self.field(content, 1, pady=(0, 8), color="#2a7a2a")
         # the two ways to get the translations, side by side: play with this program open (it translates by itself),
@@ -553,7 +565,7 @@ class App:
         self.lbl_opt2_body.grid(row=0, column=0, sticky="ew")
         self.lbl_opt2_note = Sel(self.card2, foreground="#555555", anchor="center", justify="center")
         self.lbl_opt2_note.grid(row=1, column=0, sticky="ew", pady=(8, 0))
-        self.btn_go_bulk = rounded_button_class()(self.card2, command=lambda: self.nb.select(self.bulk_tab), fill=ACCENT, dark=ACCENT_DARK, off=ACCENT_OFF)
+        self.btn_go_bulk = Btn(self.card2, command=lambda: self.nb.select(self.bulk_tab), style="green")
         self.btn_go_bulk.grid(row=2, column=0, sticky="ew", pady=(10, 0))
         self.lbl_restart = Sel(content, foreground="#8a5a00", anchor="center", justify="center")        # restart if the game does not show new translations
         self.lbl_restart.grid(row=3, column=0, sticky="ew", pady=(8, 0))
@@ -573,17 +585,17 @@ class App:
         self.progress = self.field(content, 7, pady=(0, 8), color="#666666")
         row1 = ttk.Frame(content)
         row1.grid(row=8, column=0, sticky="ew", pady=3)
-        self.btn_check = ttk.Button(row1, command=self.start_check)
-        self.btn_apply = ttk.Button(row1, command=self.start_update, state="disabled")
-        self.btn_changelog = rounded_button_class()(row1, command=lambda: webbrowser.open(CHANGELOG_URL), fill=BLUE, dark=BLUE_DARK)      # the list of changes is on GitHub, not in the window
+        self.btn_check = Btn(row1, command=self.start_check)
+        self.btn_apply = Btn(row1, command=self.start_update, state="disabled")
+        self.btn_changelog = Btn(row1, command=lambda: webbrowser.open(CHANGELOG_URL), style="blue")      # the list of changes is on GitHub, not in the window
         self.stretch(row1, [self.btn_check, self.btn_apply, self.btn_changelog])
         row2 = ttk.Frame(content)
         row2.grid(row=9, column=0, sticky="ew", pady=3)
-        self.btn_data = ttk.Button(row2, command=self.open_data_folder)
-        self.btn_modfolder = ttk.Button(row2, command=self.open_mod_folder)
-        self.btn_report = ttk.Button(row2, command=self.report)
-        self.btn_github = ttk.Button(row2, command=lambda: webbrowser.open(REPO_URL))
-        self.btn_quit = ttk.Button(row2, command=self.quit)
+        self.btn_data = Btn(row2, command=self.open_data_folder)
+        self.btn_modfolder = Btn(row2, command=self.open_mod_folder)
+        self.btn_report = Btn(row2, command=self.report)
+        self.btn_github = Btn(row2, command=lambda: webbrowser.open(REPO_URL))
+        self.btn_quit = Btn(row2, command=self.quit)
         self.stretch(row2, [self.btn_data, self.btn_modfolder, self.btn_report, self.btn_github, self.btn_quit])
 
     def build_bulk(self):
@@ -598,14 +610,13 @@ class App:
         self.dir_rows = []
         btns = ttk.Frame(b)
         btns.grid(row=2, column=0, sticky="ew", pady=3)
-        self.btn_add_dir = ttk.Button(btns, command=self.add_dir)
-        self.btn_add_dir.bind("<Configure>", lambda e: self.root.after_idle(self.match_button_height))
-        self.btn_scan = ttk.Button(btns, command=self.refresh_plan)
+        self.btn_add_dir = Btn(btns, command=self.add_dir)
+        self.btn_scan = Btn(btns, command=self.refresh_plan)
         # the main action stands out: a coloured button (a plain tk.Button, because the native ttk buttons of Windows ignore colours)
-        self.btn_bulk = rounded_button_class()(btns, command=lambda: self.start_bulk(False), fill=ACCENT, dark=ACCENT_DARK, off=ACCENT_OFF, state="disabled")
-        self.btn_bulk_all = ttk.Button(btns, command=lambda: self.start_bulk(True))
-        self.btn_stop = ttk.Button(btns, command=self.stop_bulk, state="disabled")
-        self.btn_clear = ttk.Button(btns, command=self.clear_translations)
+        self.btn_bulk = Btn(btns, command=lambda: self.start_bulk(False), style="green", state="disabled")
+        self.btn_bulk_all = Btn(btns, command=lambda: self.start_bulk(True))
+        self.btn_stop = Btn(btns, command=self.stop_bulk, state="disabled")
+        self.btn_clear = Btn(btns, command=self.clear_translations)
         self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop, self.btn_clear], uniform=False)
         self.pbar = ttk.Progressbar(b, orient="horizontal", mode="determinate", maximum=100)
         self.pbar.grid(row=3, column=0, sticky="ew", pady=(8, 2))
@@ -655,11 +666,11 @@ class App:
         self.log_filter_box = ttk.Combobox(bar, state="readonly", width=24)
         self.log_filter_box.grid(row=0, column=1, padx=(0, 12))
         self.log_filter_box.bind("<<ComboboxSelected>>", lambda _e: self.render_log())
-        self.btn_log_copy = ttk.Button(bar, command=self.copy_log)
+        self.btn_log_copy = Btn(bar, command=self.copy_log)
         self.btn_log_copy.grid(row=0, column=2, padx=3)
-        self.btn_log_clear = ttk.Button(bar, command=self.clear_log)
+        self.btn_log_clear = Btn(bar, command=self.clear_log)
         self.btn_log_clear.grid(row=0, column=3, padx=3)
-        self.btn_log_folder = ttk.Button(bar, command=lambda: open_folder(logs_dir()))      # right next to "Clear"
+        self.btn_log_folder = Btn(bar, command=lambda: open_folder(logs_dir()))      # right next to "Clear"
         self.btn_log_folder.grid(row=0, column=4, padx=3)
         tf = ttk.Frame(lg)
         tf.grid(row=2, column=0, sticky="nsew")
@@ -798,16 +809,6 @@ class App:
         self.log_entries = []
         self.render_log()
 
-    def match_button_height(self):
-        """The coloured buttons get the same height as the native buttons around them, so they look like one family."""
-        try:
-            self.root.update_idletasks()
-            target = max(self.btn_add_dir.winfo_height(), self.btn_add_dir.winfo_reqheight())       # what a native button really measures
-            for b in (self.btn_bulk, self.btn_go_bulk, self.btn_changelog):
-                b.configure(height=target)
-        except Exception:  # noqa: BLE001
-            log.exception("could not match the button heights")
-
     def on_resize(self, event):
         if event.widget is not self.root:
             return
@@ -871,7 +872,6 @@ class App:
         self.render_rows()
         self.apply_log_language()
         self.refresh_details_windows()
-        self.match_button_height()
         self.fit_window()
 
     def fit_window(self):
@@ -1214,7 +1214,7 @@ class App:
         self.btn_bulk.configure(text=self.t("bulk_start_pending", n=pend))
         idle = not self.bulk_running
         can_run = idle and pend > 0 and bool(self.selected_target())
-        self.btn_bulk.configure(state="normal" if can_run else "disabled", bg=ACCENT if can_run else ACCENT_OFF)
+        self.btn_bulk.configure(state="normal" if can_run else "disabled")
         self.btn_bulk_all.configure(state="normal" if idle and self.plan_rows and self.selected_target() else "disabled")
         self.btn_scan.configure(state="normal" if idle else "disabled")
         self.btn_add_dir.configure(state="normal" if idle else "disabled")
@@ -1719,7 +1719,7 @@ class App:
             txt.configure(state="normal")
             txt.insert("end", t("det_empty"))
             txt.configure(state="disabled")
-        ttk.Button(top, text=t("det_close"), command=top.destroy).grid(row=3, column=0, pady=(0, 8))
+        rounded_button_class()(top, text=t("det_close"), command=top.destroy).grid(row=3, column=0, pady=(0, 8))
         top.details = {"translated": tv1, "words": tv3, "skipped": tv2, "text": txt, "full": full, "nb": nb, "tabs": [tv1, tv3, tv2]}
         if n_failed and not keep_sel:                          # something failed: open on the tab where the red rows are
             nb.select(2)

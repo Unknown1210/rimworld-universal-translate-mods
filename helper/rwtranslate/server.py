@@ -49,11 +49,38 @@ def translate_texts(source, target, texts):
     if languages.same(source, target):
         return list(texts)
     engine = get_engine(source, target)
+    todo = [t for t in texts if glossary.lookup(source, target, t) is None]
+    ready = _translate_together(engine, todo)
     out = []
     for t in texts:
         g = glossary.lookup(source, target, t)
-        out.append(clean_output(t, g if g is not None else translate_protected(t, engine.translate_batch), target))
+        out.append(clean_output(t, g if g is not None else translate_protected(t, ready), target))
     return out
+
+
+def _translate_together(engine, texts):
+    """Many short texts one by one keep the model nearly idle: first collect every string the texts will send to the model
+    (a dry run with the identity function), translate them ALL in one call, and hand the results back by lookup.
+    A string that was not collected (a text that needed the segment-by-segment fallback) goes to the model on its own."""
+    wanted = {}
+
+    def collect(batch):
+        for b in batch:
+            wanted.setdefault(b, None)
+        return list(batch)
+    for t in texts:
+        translate_protected(t, collect)
+    if len(wanted) > 1:
+        keys = list(wanted)
+        for k, v in zip(keys, engine.translate_batch(keys)):
+            wanted[k] = v
+
+    def lookup(batch):
+        miss = [b for b in batch if wanted.get(b) is None]
+        got = dict(zip(miss, engine.translate_batch(miss))) if miss else {}
+        wanted.update(got)
+        return [wanted[b] for b in batch]
+    return lookup
 
 
 def _code_ok(c):
@@ -118,6 +145,9 @@ def make_handler(token):
                 code, note = 409, str(e)
                 log.error("[%s] engine unavailable: %s", rid, e)
                 size = self._send(code, {"error": str(e), "request_id": rid, "type": "EngineError"})
+            except (ConnectionError, BrokenPipeError) as e:
+                # the caller (the game) gave up waiting and closed the connection: nothing left to answer
+                code, note = 499, f"client closed the connection ({type(e).__name__})"
             except Exception as e:
                 code, note = 500, f"{type(e).__name__}: {e}"
                 log.error("[%s] UNHANDLED %s %s\n%s", rid, method, self.path, traceback.format_exc())

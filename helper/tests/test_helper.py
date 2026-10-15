@@ -387,6 +387,123 @@ class RepairSavedTranslations(unittest.TestCase):
         self.assertEqual(bulk.repair_all("pt-BR"), 0)             # nothing left to fix
 
 
+class BatchedTranslation(unittest.TestCase):
+    def test_many_texts_reach_the_model_in_one_call(self):
+        calls = []
+
+        class Fake:
+            def translate_batch(self, texts):
+                calls.append(list(texts))
+                return [f"<{t}>" for t in texts]
+        from unittest import mock
+        with mock.patch.object(server, "get_engine", lambda s, t: Fake()):
+            out = server.translate_texts("en", "de", ["iron sword", "wooden shield", "A {0} of steel", "iron sword"])
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(out[0], out[3])
+        self.assertTrue(all(o for o in out))
+
+
+class FakeResult:
+    def __init__(self, toks):
+        self.hypotheses = [toks]
+
+
+class FakeSP:
+    def encode(self, s, out_type=str):
+        return s.split()
+
+
+class EngineSafety(unittest.TestCase):
+    """Speed must never cost correctness: loops are caught, the stop button works, big requests are cut in chunks."""
+
+    def make(self, answer):
+        from rwtranslate import engine as eng
+        e = eng.CT2Engine.__new__(eng.CT2Engine)
+        e._lock = threading.Lock()
+        e._sp = e._sp_out = FakeSP()
+        calls = []
+
+        class Tr:
+            def translate_batch(self, toks, **kw):
+                calls.append((len(toks), kw))
+                return [FakeResult(answer(t, kw)) for t in toks]
+        e._tr = Tr()
+        old = eng.detokenize
+        eng.detokenize = lambda sp, toks: " ".join(toks)
+        self.addCleanup(setattr, eng, "detokenize", old)
+        return e, calls
+
+    def test_degenerate_detection(self):
+        from rwtranslate.engine import degenerate
+        self.assertTrue(degenerate(["a", "b"], "相相相相相相相相"))
+        self.assertTrue(degenerate(["a"] * 3, " ".join(["ok"] * 20)))
+        self.assertFalse(degenerate(["a", "b", "c"], "Olá mundo, tudo bem?"))
+
+    def test_loop_is_retried_then_original_kept(self):
+        e, calls = self.make(lambda t, kw: ["xxxxxxxxxxx"])      # always loops
+        self.assertEqual(e._run(["hello world"]), ["hello world"])
+        e, calls = self.make(lambda t, kw: ["ok"] if kw.get("no_repeat_ngram_size") else ["yyyyyyyyyyy"])
+        self.assertEqual(e._run(["hello world"]), ["ok"])
+
+    def test_decoding_length_follows_the_source(self):
+        e, calls = self.make(lambda t, kw: ["a"])
+        e._run(["one two three"])
+        self.assertLessEqual(calls[0][1]["max_decoding_length"], 2 * 3 + 16)
+
+    def test_chunks_and_order_preserved(self):
+        from rwtranslate import engine as eng
+        e, calls = self.make(lambda t, kw: [w.upper() for w in t])
+        texts = [("w " * (i % 5 + 1)).strip() + f" n{i}" for i in range(30)]
+        outs = e._run(texts)
+        self.assertEqual(outs, [t.upper() for t in texts])
+        self.assertGreater(len(calls), 1)
+        self.assertTrue(all(n <= eng.CHUNK_SENTENCES for n, _ in calls))
+
+    def test_stop_between_chunks(self):
+        from rwtranslate import engine as eng
+        e, calls = self.make(lambda t, kw: ["a"])
+        ev = threading.Event()
+        ev.set()
+        eng.set_cancel(ev)
+        try:
+            with self.assertRaises(eng.Cancelled):
+                e._run(["a b"] * 40)
+        finally:
+            eng.set_cancel(None)
+        self.assertEqual(calls, [])
+
+
+class UnsupportedPackages(unittest.TestCase):
+    def test_bpe_only_pairs_are_not_offered(self):
+        index = [{"from_code": "hu", "to_code": "en"}, {"from_code": "cs", "to_code": "en"}, {"from_code": "de", "to_code": "en"}]
+        self.assertEqual(models_mod.available_pairs(index), [("de", "en")])
+        self.assertFalse(models_mod.support("hu", "pb", index)["supported"])
+
+    def test_a_download_without_a_readable_tokenizer_is_marked_unsupported(self):
+        import io
+        import zipfile
+        from unittest import mock
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("pkg/model/model.bin", "x")
+            z.writestr("pkg/bpe.model", "x")
+
+        def fake_unpack(url, tmp, dest, progress):
+            zipfile.ZipFile(buf).extractall(dest)
+        index = [{"from_code": "xx", "to_code": "en", "package_version": "1.0", "links": ["u"]}]
+        with mock.patch.object(models_mod, "_download_and_unpack", fake_unpack):
+            with self.assertRaises(RuntimeError):
+                models_mod._install_pair("xx", "en", lambda m: None, index)
+        self.assertTrue(models_mod.is_unsupported("xx", "en"))
+        self.assertFalse(models_mod.pair_dir("xx", "en").exists())
+
+    def test_english_sentences_are_not_taken_for_czech_or_hungarian(self):
+        from rwtranslate import langdetect
+        for t in ["A fake tree similar to a palm tree, made to be a pleasing decoration.",
+                  "Make a pleasing, aromatic beverage to be sold by the traders."]:
+            self.assertEqual(langdetect.latin_lang([t])[0], "en", t)
+
+
 class ModelFiles(unittest.TestCase):
     def test_finds_the_usual_and_the_split_tokenizer_layouts(self):
         import pathlib

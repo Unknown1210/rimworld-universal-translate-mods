@@ -20,7 +20,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-from . import activity, config, glossary, langdetect, languages, logsetup, models, server, updater
+from . import activity, config, engine, glossary, langdetect, languages, logsetup, models, server, updater
 from .paths import data_dir
 
 log = logsetup.get("bulk")
@@ -395,11 +395,24 @@ def _translate_group(src, target, texts, result, cancel, on_batch):
         try:
             for t, tr in zip(batch, server.translate_texts(src, target, batch)):
                 out[t] = tr
+        except engine.Cancelled:
+            break
+        except server.EngineError as e:      # no usable model: say it once for the whole group, not once per text
+            for t in texts[i - len(batch):]:
+                result.failed += 1
+                if len(result.skipped) < SKIP_LIST_MAX:
+                    result.skipped.append({"text": t, "reason": "failed", "detail": " ".join(str(e).split())[:300]})
+            log.error("no usable model for %s->%s (%s); skipping %d texts of %s", src, target, e, len(texts) - (i - len(batch)), result.package_id)
+            break
         except Exception:  # noqa: BLE001 - isolate the failing text, keep going
             log.warning("batch of %d failed (%s->%s); retrying one by one", len(batch), src, target, exc_info=True)
             for t in batch:
+                if cancel and cancel.is_set():
+                    break
                 try:
                     out[t] = server.translate_texts(src, target, [t])[0]
+                except engine.Cancelled:
+                    break
                 except Exception as e:  # noqa: BLE001
                     result.failed += 1
                     if len(result.skipped) < SKIP_LIST_MAX:
@@ -506,9 +519,11 @@ def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending
     t.start()
     global _polite
     _polite = polite
+    engine.set_cancel(cancel)
     try:
         return _run(target, dirs, force, progress, cancel, only_pending)
     finally:
+        engine.set_cancel(None)
         _polite = False
         stop.set()
         t.join(timeout=3)

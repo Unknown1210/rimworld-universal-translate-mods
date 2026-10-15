@@ -112,6 +112,25 @@ namespace AutoTranslate
             catch (Exception e) { AtLog.Warn("config", "cannot read config.json (ignored)", e); return null; }
         }
 
+        /// <summary>Languages the translator program has already translated into: one cache folder per language with at least one file.</summary>
+        public static List<string> CachedLanguages()
+        {
+            var list = new List<string>();
+            try
+            {
+                if (!Directory.Exists(Paths.CacheDir)) return list;
+                foreach (string d in Directory.GetDirectories(Paths.CacheDir))
+                {
+                    string code = NormTarget(Path.GetFileName(d));
+                    if (string.IsNullOrEmpty(code) || list.Contains(code)) continue;
+                    if (Directory.GetFiles(d, "*.json").Length > 0) list.Add(code);
+                }
+            }
+            catch (Exception e) { AtLog.Warn("config", "cannot list the translated languages (ignored)", e); }
+            list.Sort(StringComparer.Ordinal);
+            return list;
+        }
+
         /// <summary>Settings value "auto" -> game language if not English, else OS language; otherwise the given code.</summary>
         public static string ResolveTarget(string setting, out string how)
         {
