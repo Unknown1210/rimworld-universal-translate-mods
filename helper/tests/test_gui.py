@@ -59,6 +59,16 @@ class Window(unittest.TestCase):
         self.__dict__.pop("app", None)
         gc.collect()          # finalisers run on the main thread here; worker threads must never be the last owner of a Tk object
 
+    def test_log_bar_widgets_have_the_same_height(self):
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        self.root.geometry("900x700")
+        self.root.update()
+        app.nb.select(app.log_tab)
+        self.root.update()
+        heights = {w.winfo_height() for w in (app.log_filter_box, app.btn_log_copy, app.btn_log_clear, app.btn_log_folder)}
+        self.assertEqual(len(heights), 1, heights)
+        self.assertGreater(heights.pop(), 10)
+
     def test_check_finds_update_and_applies_it(self):
         d = Path(tempfile.mkdtemp())
         exe = d / "UniversalTranslate-Helper.exe"
@@ -272,16 +282,19 @@ class Window(unittest.TestCase):
         app.set_lang("en")                                                      # the arrow survives a change of window language
         self.assertIn("\u25bc", app.tree.heading("state")["text"])
 
-    def test_background_option_is_locked_while_a_translation_runs(self):
+    def test_target_and_background_option_are_locked_while_a_translation_runs(self):
         app = self.build(fake_fetcher(release_json("v0.0")))
         self.assertFalse(app.chk_bg.instate(["disabled"]))
+        self.assertEqual(str(app.lang_box.cget("state")), "readonly")
         app.bulk_running = True
         app.update_bulk_buttons()
         self.assertTrue(app.chk_bg.instate(["disabled"]), "can not be changed while translating: stop the run first")
+        self.assertEqual(str(app.lang_box.cget("state")), "disabled", "the target language is locked too")
         self.assertIn("Parar", app.lbl_bg_note.cget("text"))
         app.bulk_running = False
         app.update_bulk_buttons()
         self.assertFalse(app.chk_bg.instate(["disabled"]))
+        self.assertEqual(str(app.lang_box.cget("state")), "readonly")
         self.assertNotIn("Parar", app.lbl_bg_note.cget("text"))
 
     def test_justified_text_fills_every_line_and_copies_as_plain_text(self):

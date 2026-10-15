@@ -664,7 +664,7 @@ class App:
         self.lbl_log_filter = selectable_label_class()(bar, autowidth=True, anchor="w", justify="left")
         self.lbl_log_filter.grid(row=0, column=0, padx=(0, 6))
         self.log_filter_box = ttk.Combobox(bar, state="readonly", width=24)
-        self.log_filter_box.grid(row=0, column=1, padx=(0, 12))
+        self.log_filter_box.grid(row=0, column=1, padx=(0, 12), sticky="ns")      # as tall as the buttons
         self.log_filter_box.bind("<<ComboboxSelected>>", lambda _e: self.render_log())
         self.btn_log_copy = Btn(bar, command=self.copy_log)
         self.btn_log_copy.grid(row=0, column=2, padx=3)
@@ -1202,10 +1202,11 @@ class App:
         self.bulk_progress.set_key("bulk_cleared", n=n, lang=label)
 
     def update_bg_note(self):
-        """While a translation is running the "also translate the disabled mods" option is locked (stop the run first), so the setting
-        and what is happening never disagree."""
+        """While a translation is running the target language and the "also translate the disabled mods" option are locked (stop the
+        run first), so the settings and what is happening never disagree."""
         busy = self.bulk_running
         self.chk_bg.state(["disabled"] if busy else ["!disabled"])
+        self.lang_box.configure(state="disabled" if busy else "readonly")
         self.lbl_bg_note.configure(text=self.t("bg_locked") if busy else self.t("bg_note"))
 
     def update_bulk_buttons(self):

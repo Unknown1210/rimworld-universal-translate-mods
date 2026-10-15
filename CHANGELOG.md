@@ -4,6 +4,11 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.027 - 2026-10-15
+- Alterado: na aba Log, a caixa "Mostrar" ficou com a mesma altura dos botões (Copiar log, Limpar, Abrir pasta de logs).
+- Alterado: enquanto há uma tradução em andamento, o idioma de destino também fica travado (como já era a opção "Traduzir também os mods desativados"); para mudar é preciso apertar Parar antes, e o aviso na tela explica isso.
+- Adicionado: testes novos para a altura dos itens da aba Log e para o travamento do idioma e da opção durante a tradução.
+
 ## v0.026 - 2026-10-15
 - Adicionado: a linha "Traduzindo: mod (X/Y textos)" agora mostra também as palavras, em outro parêntese: "(X/Y palavras)", em português e em inglês.
 - Adicionado: teste novo para o formato da linha de progresso.
