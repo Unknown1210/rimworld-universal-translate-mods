@@ -4,6 +4,13 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.048 - 2026-10-16
+- Adicionado: botão "Exportar traduções" na aba Traduzir mods, para quem faz mods: grava, dos mods marcados (ou de todos) e dos idiomas marcados, a pasta Languages no formato do RimWorld (DefInjected e Keyed, uma pasta por idioma, mantendo pastas de versão como 1.6), pronta para copiar para dentro do mod; só entram os textos traduzidos, com as correções do usuário.
+- Adicionado: ao abrir o programa, se houver versão nova, uma janela pequena avisa ("Nova atualização disponível"); a atualização continua sendo feita na aba Início, em "Atualizar agora".
+- Corrigido: no mod, uma correção feita à mão no programa agora é aplicada ao vivo em todos os mods que têm aquele texto, e não só no mod cujo arquivo foi gravado (nomes de itens e botões que não mudavam).
+- Adicionado: pergunta "Sou criador de mods: posso usar as traduções no meu mod?" na aba Ajuda e no FAQ.md; a pergunta sobre vários idiomas citava o nome antigo do botão e foi corrigida.
+- Adicionado: testes novos para a exportação (arquivos, correções, idiomas e nomes das pastas), o botão de exportar, a janela de nova versão e a correção ao vivo no mod.
+
 ## v0.047 - 2026-10-16
 Resumo de tudo o que mudou desde a v0.029 (v0.030 a v0.047).
 

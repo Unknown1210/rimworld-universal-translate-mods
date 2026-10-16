@@ -11,12 +11,12 @@
 
 <div align="justify">
 
-**Versão atual: 0.047** · [Baixar na aba Releases](../../releases/latest)
+**Versão atual: 0.048** · [Baixar na aba Releases](../../releases/latest)
 
 Traduz **automaticamente** os outros mods do seu jogo para o seu idioma, **sem precisar de um mod de tradução para cada mod**.
 A tradução é feita **no seu computador e de graça**. Depois de baixar uma vez o modelo do seu idioma, **não precisa de internet**. Cada tradução fica salva, então ela só é feita uma vez.
 
-> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.047). Veja "Estado atual" abaixo.
+> **Em desenvolvimento.** Este projeto foi feito com a ajuda do **Claude** (IA da Anthropic) e ainda está em fase inicial (versão atual 0.048). Veja "Estado atual" abaixo.
 
 <h2 align="left">Compatibilidade</h2>
 
@@ -72,6 +72,7 @@ Na aba **Traduzir mods** do executável:
 - **Parar:** interrompe; o que já foi traduzido fica salvo.<br><sub>────────────</sub>
 - **Aba Ajuda (FAQ):** perguntas e respostas dentro do programa, com uma caixa de busca; as mesmas estão na página [FAQ](FAQ.md) deste repositório.<br><sub>────────────</sub>
 - **Corrigir uma tradução à mão:** na janela de detalhes (dois cliques em um mod), clique em um texto das abas "Textos traduzidos" ou "Palavras traduzidas"; no quadro de baixo, o original fica à esquerda e a tradução à direita. Edite a tradução e clique em **Salvar**: a sua versão é gravada em `overrides` (o jogo sempre usa a sua correção) e nas traduções salvas do mod. **Restaurar padrão** apaga a sua correção e traduz o texto de novo. Se o jogo estiver aberto, ele aplica a correção em poucos segundos, sem reiniciar. A janela de detalhes também tem **filtro** (mostra só os textos que contêm o que você digitar) e o botão **Quebrar linhas**; ela pode ser redimensionada.<br><sub>────────────</sub>
+- **Exportar traduções (para quem faz mods):** na aba Traduzir mods, marque os mods (ou nenhum, para todos), marque os idiomas e clique em **Exportar traduções**; escolha uma pasta. Para cada mod o programa grava `<pasta>/<nome do mod>/Languages/<idioma>/DefInjected/<TipoDeDef>/<arquivo>.xml` e `.../Keyed/<arquivo>.xml` no formato do RimWorld (uma pasta por idioma, como `PortugueseBrazilian` e `Japanese`; se o mod usa pastas de versão, como `1.6`, elas são mantidas). Basta copiar a pasta `Languages` para dentro do seu mod. Só entram os textos que o programa traduziu, com as suas correções; são traduções automáticas, revise antes de publicar e respeite a licença do mod original.<br><sub>────────────</sub>
 - **Vários idiomas:** o botão **Idioma para tradução dos mods (N)** (centralizado, abaixo dos demais botões) abre a mesma lista de idiomas da aba Início, com caixas de marcar, "Marcar todos" e "Desmarcar todos". Ao traduzir, o programa faz um idioma depois do outro (o idioma usado no jogo primeiro), baixa os modelos que faltam e **pergunta antes de começar**, porque cada idioma é um modelo (dezenas a centenas de MB) e o tempo é multiplicado pelo número de idiomas. A coluna "Estado" mostra em quantos idiomas cada mod está traduzido. A tradução automática em segundo plano só faz o idioma usado no jogo.<br><sub>────────────</sub>
 - **Caixas de seleção:** a primeira coluna da tabela tem uma caixa por mod (a caixa do cabeçalho marca ou desmarca todos). Com mods marcados, os botões viram **Traduzir selecionados** e **Refazer selecionados** e trabalham só com eles; sem nenhum marcado, tudo funciona como antes.<br><sub>────────────</sub>
 - **Tradução automática em segundo plano** (aba Início, no quadro "Jogue com este programa aberto"): começa 30 segundos depois de abrir o programa e inclui os mods desativados; os mods que o jogo está usando vão primeiro. Desligada, o programa só traduz quando você clica em **Traduzir pendentes**; a sua escolha fica salva. Enquanto uma tradução está em andamento, essa opção e o idioma de destino ficam travados (clique em **Parar** para mudar).<br><sub>────────────</sub>
@@ -128,7 +129,7 @@ Com o **modo desenvolvedor** do RimWorld ligado, o próprio jogo marca os textos
 
 <h2 align="left">Estado atual (transparência)</h2>
 
-Esta é uma **versão inicial** (versão atual 0.047), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. **A tradução automática não é 100% perfeita**, mas é bem melhor do que jogar com um mod que não está no seu idioma. **Se você encontrar qualquer erro, por favor reporte** (veja "Deu problema ou conflito com um mod?" abaixo): isso ajuda a melhorar o projeto para todo mundo.
+Esta é uma **versão inicial** (versão atual 0.048), feita com a ajuda do Claude. O mod compila contra a API do RimWorld 1.6 e o código passou nos testes automáticos (inclusive o teste da janela do executável no Windows do GitHub), mas **ainda não foi testado a fundo dentro do RimWorld** nem com muitos mods reais. Podem aparecer erros, principalmente com mods que mexem nos mesmos textos. **A tradução automática não é 100% perfeita**, mas é bem melhor do que jogar com um mod que não está no seu idioma. **Se você encontrar qualquer erro, por favor reporte** (veja "Deu problema ou conflito com um mod?" abaixo): isso ajuda a melhorar o projeto para todo mundo.
 
 <h2 align="left">Deu problema ou conflito com um mod?</h2>
 

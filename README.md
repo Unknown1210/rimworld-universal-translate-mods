@@ -6,7 +6,7 @@
 <a href="FAQ.md"><img src="https://img.shields.io/badge/FAQ-AJUDA_%2F_HELP-2ea44f?style=for-the-badge" alt="FAQ"></a>
 </p>
 
-<p align="center"><b>Versão atual / Current version: 0.047</b> · <a href="../../releases/latest">Releases</a></p>
+<p align="center"><b>Versão atual / Current version: 0.048</b> · <a href="../../releases/latest">Releases</a></p>
 
 <div align="center">
 

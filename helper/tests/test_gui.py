@@ -43,6 +43,10 @@ class Window(unittest.TestCase):
         from rwtranslate import gui, server
         from rwtranslate import config
         config.set("targets", None)                  # (one language unless the test ticks more: tests share the settings file)
+        from unittest import mock
+        self.notices = []                            # the small "new version" window must never block a test: it is recorded instead
+        self._notice_patch = mock.patch("tkinter.messagebox.showinfo", side_effect=lambda *a, **k: self.notices.append(a))
+        self._notice_patch.start()
         self.httpd = server.serve(0)
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
         self.root = tkinter.Tk()
@@ -52,6 +56,8 @@ class Window(unittest.TestCase):
 
     def tearDown(self):
         import gc
+        if hasattr(self, "_notice_patch"):
+            self._notice_patch.stop()
         try:
             self.httpd.shutdown()
             self.httpd.server_close()
@@ -87,6 +93,21 @@ class Window(unittest.TestCase):
         self.assertEqual(exe.read_bytes(), NEW_EXE)
         self.assertEqual((mod / "1.6/Assemblies/RimWorldAutoTranslate.dll").read_bytes(), b"DLL-NEW")
         self.assertEqual(restarted[0], exe)
+
+    def test_a_small_window_tells_about_a_new_version_when_the_program_opens(self):
+        app = self.build(fake_fetcher(release_json("v9.0")))
+        self.assertTrue(pump(self.root, lambda: bool(self.notices)))
+        self.assertEqual(len(self.notices), 1)
+        self.assertIn("v9.0", self.notices[0][1])
+        self.assertIn("Atualizar agora", self.notices[0][1])
+        app.start_check()                                            # a later check by hand only updates the line on the Home tab
+        self.assertTrue(pump(self.root, lambda: "Nova versão disponível" in app.update_msg.get()))
+        self.assertEqual(len(self.notices), 1)
+
+    def test_no_window_when_the_program_is_up_to_date(self):
+        app = self.build(fake_fetcher(release_json("v0.0")))
+        self.assertTrue(pump(self.root, lambda: "mais nova" in app.update_msg.get()))
+        self.assertEqual(self.notices, [])
 
     def test_mod_problem_still_updates_and_restarts_the_program(self):
         """The mod folder cannot be written (the game is open): the new exe is already in place, so the program still restarts into it
@@ -370,7 +391,7 @@ class Window(unittest.TestCase):
         self.assertEqual(app.nb.tab(app.faq_tab, "text"), "Ajuda (FAQ)")
         text = app.faq_text.get("1.0", "end")
         self.assertIn("Do que eu preciso para as traduções funcionarem no jogo?", text)
-        self.assertEqual(i18n.faq_count(), 13)
+        self.assertEqual(i18n.faq_count(), 14)
         for i in range(1, i18n.faq_count() + 1):                    # every question has its answer, in both handwritten languages
             for lang in ("pt", "en"):
                 self.assertTrue(i18n.TEXT[lang][f"faq_q{i}"].strip() and i18n.TEXT[lang][f"faq_a{i}"].strip())
@@ -734,6 +755,32 @@ class Window(unittest.TestCase):
         self.assertEqual(len(asked), 1)
         self.assertIn("1 mod", asked[0])
         self.assertNotIn("2 mods", asked[0])
+
+    def test_export_button_writes_the_ticked_mods_in_the_ticked_languages(self):
+        from unittest import mock
+        app = self._app_with_mods(("pt-BR", "ja"))
+        app.render_rows()
+        app.update_bulk_buttons()
+        self.assertEqual(str(app.btn_export.cget("state")), "normal")
+        self.assertEqual(app.btn_export.cget("text"), "Exportar traduções")
+        app.sel_ids = {"b.mod"}
+        calls = []
+
+        def fake_export(mods, langs, dest):
+            calls.append(([m.package_id for m in mods], list(langs), str(dest)))
+            return {"mods": 1, "files": 3, "texts": 9, "languages": ["pt-BR", "ja"], "folder": str(dest)}
+        with mock.patch("rwtranslate.export.export_all", side_effect=fake_export), \
+                mock.patch.object(app, "choose_export_folder", return_value="/tmp/out-x"), \
+                mock.patch("rwtranslate.gui.open_folder") as opened, \
+                mock.patch.object(app, "run_bg", side_effect=lambda work, done: done(work(), None)):
+            app.export_translations()
+        self.assertEqual(calls, [(["b.mod"], ["pt-BR", "ja"], "/tmp/out-x")], "only the ticked mod, in every ticked language")
+        self.assertIn("2 idioma(s)", app.bulk_progress.get())
+        opened.assert_called_once()
+        # nothing chosen: nothing happens
+        with mock.patch("rwtranslate.export.export_all") as exp, mock.patch.object(app, "choose_export_folder", return_value=None):
+            app.export_translations()
+        exp.assert_not_called()
 
     def test_languages_window_has_the_buttons_under_the_game_language_and_the_wheel_works_anywhere(self):
         app = self._app_with_mods(("pt-BR", "es"))

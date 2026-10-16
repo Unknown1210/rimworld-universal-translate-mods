@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "rimworld-auto-translate-helper"
-version = "0.047.0"
+version = "0.048.0"
 description = "Local offline translation helper for the RimWorld Auto Translate mod"
 requires-python = ">=3.9"
 dependencies = ["ctranslate2>=4.0", "sentencepiece>=0.2"]

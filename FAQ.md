@@ -61,7 +61,11 @@ Na aba Início, o botão Relatório de problema gera um arquivo com os logs e in
 
 ### 13. Posso traduzir para vários idiomas?
 
-Sim. Na aba Início, o botão "Idiomas para traduzir" (ou o botão "Idiomas (N)..." da aba Traduzir mods) abre a lista de idiomas com caixas de marcar; as duas telas são a mesma lista. O jogo usa só um idioma: o escolhido em "Idioma usado no jogo". Cada idioma precisa do seu modelo (dezenas a centenas de MB) e o tempo é multiplicado pelo número de idiomas, por isso o programa pergunta antes de começar. Se você parar, o que foi feito fica salvo. A tradução automática em segundo plano só faz o idioma usado no jogo.
+Sim. Na aba Início, o botão "Idiomas para traduzir" (ou o botão "Idioma para tradução dos mods (N)" da aba Traduzir mods) abre a lista de idiomas com caixas de marcar; as duas telas são a mesma lista. O jogo usa só um idioma: o escolhido em "Idioma usado no jogo". Cada idioma precisa do seu modelo (dezenas a centenas de MB) e o tempo é multiplicado pelo número de idiomas, por isso o programa pergunta antes de começar. Se você parar, o que foi feito fica salvo. A tradução automática em segundo plano só faz o idioma usado no jogo.
+
+### 14. Sou criador de mods: posso usar as traduções no meu mod?
+
+Pode. Na aba Traduzir mods, marque os mods (ou deixe nenhum marcado para todos), marque os idiomas e clique em Exportar traduções; escolha uma pasta. O programa grava, para cada mod, a pasta Languages no formato do RimWorld (DefInjected e Keyed, uma pasta por idioma, como PortugueseBrazilian e Japanese), pronta para copiar para dentro do seu mod. Só entram os textos que o programa traduziu, com as suas correções. São traduções automáticas: revise antes de publicar e respeite a licença do mod original.
 
 ---
 
@@ -117,4 +121,8 @@ On the Home tab, the Problem report button creates a file with the logs and prog
 
 ### 13. Can I translate into several languages?
 
-Yes. On the Home tab, the "Languages to translate into" button (or the "Languages (N)..." button of the Translate mods tab) opens the list of languages with tick boxes; both are the same list. The game uses only one language: the one chosen in "Language used in the game". Each language needs its own model (tens to hundreds of MB) and the time is multiplied by the number of languages, so the program asks before it starts. If you stop, what was done stays saved. The automatic translation in the background only does the language used in the game.
+Yes. On the Home tab, the "Languages to translate into" button (or the "Language for translating the mods (N)" button of the Translate mods tab) opens the list of languages with tick boxes; both are the same list. The game uses only one language: the one chosen in "Language used in the game". Each language needs its own model (tens to hundreds of MB) and the time is multiplied by the number of languages, so the program asks before it starts. If you stop, what was done stays saved. The automatic translation in the background only does the language used in the game.
+
+### 14. I make mods: can I use the translations in my mod?
+
+Yes. In the Translate mods tab, tick the mods (or none for all of them), tick the languages and click Export translations; choose a folder. For every mod the program writes the Languages folder in RimWorld's format (DefInjected and Keyed, one folder per language, such as PortugueseBrazilian and Japanese), ready to be copied into your mod. Only the texts the program translated are written, with your corrections. They are automatic translations: review them before publishing and respect the license of the original mod.

@@ -11,12 +11,12 @@
 
 <div align="justify">
 
-**Current version: 0.047** · [Download from the Releases tab](../../releases/latest)
+**Current version: 0.048** · [Download from the Releases tab](../../releases/latest)
 
 Translates the other mods in your game into your language **automatically**, **without needing a translation mod for each mod**.
 The translation runs **on your computer and for free**. After the model for your language is downloaded once, **no internet is needed**. Every translation is saved, so it is only done once.
 
-> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.047). See "Current status" below.
+> **Under development.** This project was made with the help of **Claude** (Anthropic's AI) and is still at an early stage (current version 0.048). See "Current status" below.
 
 <h2 align="left">Compatibility</h2>
 
@@ -72,6 +72,7 @@ In the **Translate mods** tab of the executable:
 - **Stop:** interrupts; what has already been translated stays saved.<br><sub>────────────</sub>
 - **Help (FAQ) tab:** questions and answers inside the program, with a search box; the same ones are on the [FAQ](FAQ.md) page of this repository.<br><sub>────────────</sub>
 - **Correcting a translation by hand:** in the details window (double-click a mod), click a text in the "Translated texts" or "Words translated" tabs; in the card below, the original is on the left and the translation on the right. Edit the translation and click **Save**: your version is written to `overrides` (the game always uses your correction) and to the mod's saved translations. **Restore default** removes your correction and translates the text again. If the game is open, it applies the correction within a few seconds, without restarting. The details window also has a **filter** (shows only the texts that contain what you type) and the **Wrap lines** button; it can be resized.<br><sub>────────────</sub>
+- **Export translations (for mod makers):** in the Translate mods tab, tick the mods (or none, for all of them), tick the languages and click **Export translations**; choose a folder. For every mod the program writes `<folder>/<mod name>/Languages/<language>/DefInjected/<DefType>/<file>.xml` and `.../Keyed/<file>.xml` in RimWorld's format (one folder per language, such as `PortugueseBrazilian` and `Japanese`; if the mod uses version folders such as `1.6`, they are kept). Just copy the `Languages` folder into your mod. Only the texts the program translated are written, with your corrections; they are automatic translations, so review them before publishing and respect the license of the original mod.<br><sub>────────────</sub>
 - **Several languages:** the **Language for translating the mods (N)** button (centred, below the other buttons) opens the same list of languages as the Home tab, with tick boxes, "Tick all" and "Untick all". When translating, the program does one language after the other (the language used in the game first), downloads the missing models and **asks before it starts**, because each language is a model (tens to hundreds of MB) and the time is multiplied by the number of languages. The "State" column shows in how many languages each mod is translated. The automatic translation in the background only does the language used in the game.<br><sub>────────────</sub>
 - **Selection boxes:** the first column of the table has a box for each mod (the header box ticks or unticks all). With mods ticked, the buttons become **Translate selected** and **Redo selected** and work only on them; with none ticked, everything works as before.<br><sub>────────────</sub>
 - **Automatic translation in the background** (Home tab, in the "Play with this program open" box): it starts 30 seconds after the program opens and includes the disabled mods; the mods the game is using come first. When it is off, the program only translates when you click **Translate pending**; your choice is remembered. While a translation is running, this option and the target language are locked (click **Stop** to change them).<br><sub>────────────</sub>
@@ -128,7 +129,7 @@ With RimWorld's **developer mode** on, the game itself marks the texts that have
 
 <h2 align="left">Current status (transparency)</h2>
 
-This is an **early version** (current version 0.047), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
+This is an **early version** (current version 0.048), made with the help of Claude. The mod compiles against the RimWorld 1.6 API and the code passed the automated tests (including the executable's window test on GitHub's Windows), but it **has not yet been tested in depth inside RimWorld** nor with many real mods. Errors may appear, mainly with mods that touch the same texts. **Automatic translation is not 100% perfect**, but it is much better than playing with a mod that is not in your language. **If you find any mistake, please report it** (see "Problem or conflict with a mod?" below): it helps improve the project for everyone.
 
 <h2 align="left">Problem or conflict with a mod?</h2>
 

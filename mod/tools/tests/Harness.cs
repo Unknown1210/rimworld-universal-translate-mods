@@ -81,6 +81,7 @@ public static class Harness
         File.WriteAllText(Path.Combine(Paths.OverridesDir, "zz.json"), "{\"entries\":{\"Hello\":\"MANUAL 2\"}}");
         File.SetLastWriteTimeUtc(Path.Combine(Paths.OverridesDir, "zz.json"), DateTime.UtcNow.AddSeconds(5));
         live.ExternalChanges();
+        Check(live.TakeOverridesChanged() && !live.TakeOverridesChanged(), "a changed overrides file is reported once, so the correction reaches every mod");
         Check(live.TryGet("m.one", "Hello", out tr) && tr == "MANUAL 2", "a changed overrides file is read again while the game runs: " + tr);
 
         // ---- HelperClient against the real Python helper

@@ -944,6 +944,7 @@ namespace AutoTranslate
             translatorBusy = busy;
             if (!look) return;
             List<string> changed = cache.ExternalChanges();
+            if (cache.TakeOverridesChanged()) ApplyOverrideChanges(changed);
             foreach (string name in changed)
             {
                 ModState ms = null;
@@ -967,6 +968,27 @@ namespace AutoTranslate
                 finally { SetMarker(null); }
                 if (n > 0) AtLog.Info("pipeline", "translation file of mod '" + ms.Id + "' changed outside the game: " + n + " text(s) applied now");
             }
+        }
+
+        /// <summary>A correction the player made in the translator program is global: every mod that holds that text gets it now (not only the mod whose
+        /// translation file was rewritten with it, which the loop in PollCache handles). Names of buttons and items often live in another mod's defs.</summary>
+        static void ApplyOverrideChanges(List<string> alreadyDone)
+        {
+            int n = 0;
+            foreach (Item it in new List<Item>(items.Values))
+            {
+                ModState ms = it.Mod;
+                if (ms == null || ms.IsSelf || !ms.Active || it.Preset || it.Text == null) continue;
+                bool done = false;
+                foreach (string name in alreadyDone) if (string.Equals(Paths.SafeFileName(ms.Id), name, StringComparison.OrdinalIgnoreCase)) { done = true; break; }
+                if (done) continue;
+                string tr;
+                if (!cache.TryGet(ms.Id, it.Source, out tr) || tr == it.Text) continue;
+                SetMarker(ms);
+                try { ApplyItem(it, tr); n++; }
+                finally { SetMarker(null); }
+            }
+            if (n > 0) AtLog.Info("pipeline", "player correction(s) applied to other mods too: " + n + " text(s)");
         }
 
         /// <summary>The player may change the target language in the translator program while the game runs: notice it and reload.</summary>

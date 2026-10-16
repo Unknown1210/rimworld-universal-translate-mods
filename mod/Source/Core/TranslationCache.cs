@@ -47,7 +47,7 @@ namespace AutoTranslate
             {
                 try
                 {
-                    if (overrides != null && StampOf(OverridesFile) != overridesStamp) overrides = null;      // read again on the next lookup
+                    if (overrides != null && StampOf(OverridesFile) != overridesStamp) { overrides = null; overridesChanged = true; }      // read again on the next lookup
                     if (!Directory.Exists(Dir)) return names;
                     foreach (string f in Directory.GetFiles(Dir, "*.json"))
                     {
@@ -135,6 +135,12 @@ namespace AutoTranslate
                 return true;
             }
         }
+
+        bool overridesChanged;
+
+        /// <summary>True once after the player's corrections file changed while the game runs. A correction applies to every mod that holds that text,
+        /// not only to the mod whose translation file was rewritten with it.</summary>
+        public bool TakeOverridesChanged() { lock (gate) { bool r = overridesChanged; overridesChanged = false; return r; } }
 
         long overridesStamp;      // last write time of the overrides file when it was read: a correction made by the player while the game runs is noticed
 

@@ -585,6 +585,69 @@ class GameFlagAfterAManualCorrection(unittest.TestCase):
             f.unlink(missing_ok=True)
 
 
+class ExportForModders(unittest.TestCase):
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        self.tmp = Path(tempfile.mkdtemp())
+        self.mod = self.tmp / "mods" / "CoolMod"
+        (self.mod / "About").mkdir(parents=True)
+        (self.mod / "About" / "About.xml").write_text("<ModMetaData><packageId>a.cool</packageId><name>Cool</name></ModMetaData>", encoding="utf-8")
+        (self.mod / "Defs").mkdir()
+        (self.mod / "Defs" / "Things.xml").write_text(
+            "<Defs><ThingDef><defName>Chair</defName><label>wooden chair</label><description>A chair.\nSit.</description></ThingDef>"
+            "<ThingDef><defName>Table</defName><label>table</label></ThingDef></Defs>", encoding="utf-8")
+        (self.mod / "1.6" / "Languages" / "English" / "Keyed").mkdir(parents=True)
+        (self.mod / "1.6" / "Languages" / "English" / "Keyed" / "Keys.xml").write_text(
+            "<LanguageData><Hello>Hello &amp; welcome</Hello></LanguageData>", encoding="utf-8")
+        from rwtranslate import bulk
+        self.bulk = bulk
+        self.info = bulk.scan([self.tmp / "mods"])[0]
+        bulk.write_cache("pt-BR", "a.cool", {"wooden chair": "cadeira de madeira", "A chair.\nSit.": "Uma cadeira.\nSente.", "Hello & welcome": "Olá & bem-vindo"})
+        bulk.write_cache("ja", "a.cool", {"wooden chair": "木の椅子"})
+        self.files = [bulk.cache_path("pt-BR", "a.cool"), bulk.cache_path("ja", "a.cool")]
+
+    def tearDown(self):
+        for f in self.files:
+            f.unlink(missing_ok=True)
+        self.bulk.overrides_path("pt-BR").unlink(missing_ok=True)
+
+    def test_writes_rimworld_language_files_for_every_language(self):
+        import xml.etree.ElementTree as ET
+        from rwtranslate import export
+        out = self.tmp / "out"
+        res = export.export_mod(self.info, ["pt-BR", "ja", "fr"], out)
+        self.assertEqual(res["languages"], ["pt-BR", "ja"], "a language with no translation writes nothing")
+        pt = out / "CoolMod" / "Languages" / "PortugueseBrazilian"
+        root = ET.parse(pt / "DefInjected" / "ThingDef" / "Things.xml").getroot()
+        self.assertEqual({e.tag: e.text for e in root}, {"Chair.label": "cadeira de madeira", "Chair.description": "Uma cadeira.\\nSente."})
+        ja = ET.parse(out / "CoolMod" / "Languages" / "Japanese" / "DefInjected" / "ThingDef" / "Things.xml").getroot()
+        self.assertEqual({e.tag: e.text for e in ja}, {"Chair.label": "木の椅子"})
+        keyed = out / "CoolMod" / "1.6" / "Languages" / "PortugueseBrazilian" / "Keyed" / "Keys.xml"
+        self.assertEqual([(e.tag, e.text) for e in ET.parse(keyed).getroot()], [("Hello", "Olá & bem-vindo")], "the folders of the mod (1.6) are kept")
+        self.assertTrue((out / "CoolMod" / "README.txt").exists())
+
+    def test_the_players_corrections_are_exported(self):
+        import xml.etree.ElementTree as ET
+        from rwtranslate import export
+        self.bulk.save_edit("pt-BR", "a.cool", "wooden chair", "cadeira rústica")
+        out = self.tmp / "out2"
+        export.export_all([self.info], ["pt-BR"], out)
+        root = ET.parse(out / "CoolMod" / "Languages" / "PortugueseBrazilian" / "DefInjected" / "ThingDef" / "Things.xml").getroot()
+        self.assertEqual(root.find("Chair.label").text, "cadeira rústica")
+
+    def test_nothing_is_written_without_translations(self):
+        from rwtranslate import export
+        res = export.export_all([self.info], ["fr"], self.tmp / "out3")
+        self.assertEqual((res["mods"], res["files"]), (0, 0))
+        self.assertFalse((self.tmp / "out3").exists())
+
+    def test_language_folders_have_the_names_of_rimworld(self):
+        from rwtranslate import export
+        self.assertEqual([export.game_folder(c) for c in ("pt-BR", "pt-PT", "es-419", "zh", "zh-Hant", "ja")],
+                         ["PortugueseBrazilian", "Portuguese", "SpanishLatin", "ChineseSimplified", "ChineseTraditional", "Japanese"])
+
+
 class FaqPage(unittest.TestCase):
     def test_faq_md_is_the_help_tab(self):
         import importlib.util

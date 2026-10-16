@@ -15,7 +15,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from . import __version__, activity, bulk, config, diagnostics, i18n, languages, logsetup, models, server, targets, uitext, updater
+from . import __version__, activity, bulk, config, diagnostics, export, i18n, languages, logsetup, models, server, targets, uitext, updater
 from .paths import data_dir, logs_dir
 
 log = logsetup.get("gui")
@@ -919,6 +919,7 @@ class App:
         activity.subscribe(self._log_cb)
         self.log_entries = list(activity.snapshot())
         self.render_log()
+        self._startup_check = True                    # the check made when the program opens also tells the player (a small window) about a new version
         self.start_check()
         self.refresh_plan()
         self._last_scan = time.time()
@@ -1049,8 +1050,12 @@ class App:
         self.btn_stop = Btn(btns, command=self.stop_bulk, state="disabled")
         self.btn_clear = Btn(btns, command=self.clear_translations)
         self.stretch(btns, [self.btn_add_dir, self.btn_scan, self.btn_bulk, self.btn_bulk_all, self.btn_stop, self.btn_clear], uniform=False)
-        self.btn_bulk_langs = Btn(btnwrap, command=self.open_languages_dialog)    # the same list of languages as on the Home tab
-        self.btn_bulk_langs.grid(row=1, column=0, padx=3, pady=(4, 0))    # centred, under the row of buttons
+        lowrow = ttk.Frame(btnwrap)                                       # centred, under the row of buttons
+        lowrow.grid(row=1, column=0, pady=(4, 0))
+        self.btn_bulk_langs = Btn(lowrow, command=self.open_languages_dialog)    # the same list of languages as on the Home tab
+        self.btn_bulk_langs.grid(row=0, column=0, padx=3)
+        self.btn_export = Btn(lowrow, command=self.export_translations)          # for mod makers: the translations as RimWorld language files
+        self.btn_export.grid(row=0, column=1, padx=3)
         prog = ttk.Frame(b)                                           # the progress card: title, bar, counters
         prog.grid(row=3, column=0, sticky="ew")
         prog.columnconfigure(0, weight=1)
@@ -1424,6 +1429,7 @@ class App:
         self.btn_bulk_all.configure(text=t("bulk_start_all"))
         self.btn_stop.configure(text=t("bulk_stop"))
         self.btn_clear.configure(text=t("bulk_clear"))
+        self.btn_export.configure(text=t("btn_export"))
         self.bulk_hint.set_key("det_hint")
         self.update_bulk_buttons()
         self.render_dirs()
@@ -1619,8 +1625,18 @@ class App:
         self.btn_check.configure(state="disabled")
         self.run_bg(lambda: updater.check(self.fetcher), self._check_done)
 
+    def notify_new_version(self, latest, current):
+        """A small window, only to tell: there is a new version (the update itself is done on the Home tab)."""
+        from tkinter import messagebox
+        try:
+            messagebox.showinfo(self.t("new_version_title"), self.t("new_version_popup", latest=latest, current=current), parent=self.root)
+        except Exception:  # noqa: BLE001 - a notice that cannot be shown must not break the program
+            log.exception("could not show the new version notice")
+
     def _check_done(self, chk, err):
         self.btn_check.configure(state="normal")
+        startup = getattr(self, "_startup_check", False)
+        self._startup_check = False
         if err or chk is None:
             self.update_msg.set_key("check_failed", err=err)
             return
@@ -1630,6 +1646,8 @@ class App:
             self.latest = chk.release
             self.update_msg.set(self.t("new_version", latest=chk.latest, current=chk.current))
             self.btn_apply.configure(state="normal")
+            if startup:
+                self.notify_new_version(chk.latest, chk.current)
         else:
             self.update_msg.set_key("up_to_date", current=chk.current)
 
@@ -1786,6 +1804,38 @@ class App:
         self.pbar["value"] = 0
         self.refresh_plan()
         self.bulk_progress.set_key("bulk_cleared", n=n, lang=label)
+
+    def export_translations(self):
+        """For mod makers: write the translations of the ticked mods (all of them when none is ticked) in every ticked language as RimWorld
+        language files (Languages/<language>/DefInjected and Keyed), in a folder the player chooses, ready to copy into the mod."""
+        if self.bulk_running or not self.plan_rows:
+            return
+        langs = self.translate_targets()
+        if not langs:
+            self.bulk_summary.set_key("bulk_no_languages")
+            return
+        ids = self.selected_ids()
+        mods = [m for m, _s, _r in self.plan_rows if not ids or m.package_id in ids]
+        dest = self.choose_export_folder()
+        if not dest:
+            return
+        self.bulk_progress.set_key("export_running")
+        self.btn_export.configure(state="disabled")
+
+        def done(res, err):
+            self.update_bulk_buttons()
+            if err or res is None:
+                self.bulk_progress.set_key("export_failed", err=err)
+            elif not res["files"]:
+                self.bulk_progress.set_key("export_nothing")
+            else:
+                self.bulk_progress.set_key("export_done", mods=res["mods"], langs=len(res["languages"]), files=res["files"], folder=res["folder"])
+                open_folder(res["folder"])
+        self.run_bg(lambda: export.export_all(mods, langs, dest), done)
+
+    def choose_export_folder(self):
+        from tkinter import filedialog
+        return filedialog.askdirectory(parent=self.root, title=self.t("export_title"), mustexist=False) or None
 
     # ------------------------------------------------------------------ several languages
     def translate_targets(self):
@@ -2043,6 +2093,7 @@ class App:
         self.btn_add_dir.configure(state="normal" if idle else "disabled")
         self.btn_stop.configure(state="disabled" if idle else "normal")
         self.btn_clear.configure(state="normal" if idle and self.selected_target() else "disabled")
+        self.btn_export.configure(state="normal" if idle and self.plan_rows else "disabled")
 
     def refresh_plan(self):
         """Scan the mod folders and compare with what was translated before (new / changed / ok)."""
