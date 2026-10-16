@@ -36,7 +36,8 @@ jobs:
         with: { python-version: "3.12" }
       - run: pip install ./helper pyinstaller
       - run: python -I -m unittest discover -s helper/tests
-      - run: pyinstaller --onefile --noconsole --name UniversalTranslate-Helper --collect-all ctranslate2 --collect-all sentencepiece helper/run_rwtranslate.py
+      - run: python tools/make_version_info.py version_info.txt
+      - run: pyinstaller --onefile --noconsole --name UniversalTranslate-Helper --version-file version_info.txt --collect-all ctranslate2 --collect-all sentencepiece helper/run_rwtranslate.py
       - name: Self-test the .exe (it has no console window, so it writes its report to a file)
         shell: pwsh
         run: |

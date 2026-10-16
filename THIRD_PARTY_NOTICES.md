@@ -9,13 +9,13 @@ o texto da licença de cada projeto, e esta lista é só um resumo de cortesia. 
 ## In the mod (the game DLL) / No mod (a DLL do jogo)
 
 | Project | Use | License |
-|---|---|---|
+|:---:|:---:|:---:|
 | [Harmony](https://github.com/pardeike/Harmony) by Andreas Pardeike (the "Harmony" RimWorld mod, [Steam Workshop](https://steamcommunity.com/workshop/filedetails/?id=2009463077)) | patches the game at run time; it is a **required mod**, not included in this mod | MIT |
 
 ## In the helper program (UniversalTranslate-Helper.exe) / No programa auxiliar
 
 | Project | Use | License |
-|---|---|---|
+|:---:|:---:|:---:|
 | [CTranslate2](https://github.com/OpenNMT/CTranslate2) (OpenNMT) | runs the translation models on the CPU | MIT |
 | [SentencePiece](https://github.com/google/sentencepiece) (Google) | splits text into the pieces the models use | Apache-2.0 |
 | [NumPy](https://numpy.org/) | numeric arrays used by CTranslate2 | BSD-3-Clause |

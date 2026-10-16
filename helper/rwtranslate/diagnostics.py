@@ -5,7 +5,7 @@ import json
 import zipfile
 
 from .logsetup import environment
-from .paths import data_dir, logs_dir
+from .paths import cache_dir, data_dir, logs_dir
 
 
 def make_bundle(out_dir=None):
@@ -17,7 +17,7 @@ def make_bundle(out_dir=None):
             if f.is_file():
                 z.write(f, "logs/" + f.relative_to(logs_dir()).as_posix())
         z.writestr("environment.json", json.dumps(environment(), indent=2, ensure_ascii=False))
-        cache = data_dir() / "cache"
+        cache = cache_dir()
         if cache.exists():  # sizes only, not content
             z.writestr("cache-summary.txt", "\n".join(
                 f"{p.relative_to(cache).as_posix()}  {p.stat().st_size} bytes" for p in sorted(cache.rglob("*.json"))))

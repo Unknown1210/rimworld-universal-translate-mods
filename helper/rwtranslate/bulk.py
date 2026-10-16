@@ -3,7 +3,7 @@
 It reads the mod folders directly (Steam "Mods" and Workshop folders, plus any folder the user adds), collects the same
 texts the game mod collects (Def labels/descriptions, English Keyed texts, the mod description), skips what already has a
 translation (the mod's own or another mod's), detects the language of the rest, translates it and writes the SAME
-per-mod cache files the game mod reads (<data>/cache/<lang>/<packageId>.json). When the game later runs, those
+per-mod cache files the game mod reads (<data>/translated mods/<lang>/<packageId>.json). When the game later runs, those
 texts are applied straight from the cache. It is best effort: anything it could not read in advance is simply
 translated by the game mod as usual.
 
@@ -21,7 +21,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from . import activity, config, engine, glossary, langdetect, languages, logsetup, models, server, updater
-from .paths import data_dir
+from .paths import cache_dir, data_dir
 
 log = logsetup.get("bulk")
 
@@ -53,7 +53,7 @@ def safe_file_name(name):
 
 
 def cache_path(target, package_id):
-    return data_dir() / "cache" / target / (safe_file_name(package_id) + ".json")
+    return cache_dir() / target / (safe_file_name(package_id) + ".json")
 
 
 def read_cache(target, package_id):
@@ -73,10 +73,132 @@ def write_cache(target, package_id, entries):
     os.replace(tmp, p)
 
 
+def languages_available(package_id):
+    """Language codes that have saved translations of this mod (a file in <translated mods>/<lang>/)."""
+    out = []
+    try:
+        for d in sorted(cache_dir().iterdir()):
+            if d.is_dir() and (d / (safe_file_name(package_id) + ".json")).is_file():
+                out.append(d.name)
+    except OSError:
+        pass
+    return out
+
+
+def languages_done(targets, mods):
+    """{package id: how many of `targets` that mod is completely translated into} (the saved state matches what is on disk now).
+    `mods` are the ModInfo objects of plan() (their fingerprint is already set)."""
+    st = state_load()
+    out = {}
+    for m in mods:
+        fp = getattr(m, "fingerprint", None) or fingerprint(m)
+        out[m.package_id] = sum(1 for t in targets if (st.get(t, {}).get(m.package_id) or {}).get("fingerprint") == fp)
+    return out
+
+
+# ---------------------------------------------------------------- manual corrections (overrides)
+# <data>/overrides/<lang>.json holds the translations the player corrected by hand: the game mod reads that file and a text found there
+# always wins over a saved translation. The correction is also written into the mod's saved translations, so the game (which watches
+# those files) and the details window show it at once.
+
+def overrides_path(target):
+    return data_dir() / "overrides" / f"{target}.json"
+
+
+def read_overrides(target):
+    try:
+        entries = json.loads(overrides_path(target).read_text(encoding="utf-8")).get("entries", {})
+    except (OSError, ValueError):
+        return {}
+    return {k: v for k, v in entries.items() if isinstance(k, str) and isinstance(v, str)}
+
+
+def write_overrides(target, entries):
+    p = overrides_path(target)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(json.dumps({"format": 1, "target": target, "entries": entries}, ensure_ascii=False, indent=0), encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def has_override(target, source):
+    n = normalize(source)
+    return any(normalize(k) == n for k in read_overrides(target))
+
+
+_runs_active = 0                 # bulk runs going on right now (they keep the game's flag file alive themselves)
+
+
+def pulse_game_flag(seconds=12.0, step=2.0):
+    """Tell the game, if it is open, that translation files are changing: it only looks at them while the flag file is fresh (and once more
+    when it goes away). A correction made by hand in the details window is not a bulk run, so the flag is kept alive for a few seconds."""
+    def beat():
+        flag = data_dir() / FLAG_NAME
+        end = time.time() + seconds
+        try:
+            while time.time() < end:
+                try:
+                    flag.write_text(str(time.time()))
+                except OSError:
+                    return
+                time.sleep(step)
+        finally:
+            if not _runs_active:
+                try:
+                    flag.unlink()
+                except OSError:
+                    pass
+    threading.Thread(target=beat, daemon=True, name="game-flag").start()
+
+
+def save_edit(target, package_id, source, translation):
+    """The player corrected the translation of `source`: keep it as a manual correction and in the mod's saved translations."""
+    ov = read_overrides(target)
+    n = normalize(source)
+    for k in [k for k in ov if normalize(k) == n]:
+        del ov[k]
+    ov[source] = translation
+    write_overrides(target, ov)
+    cache = read_cache(target, package_id)
+    cache[source] = translation
+    write_cache(target, package_id, cache)
+    pulse_game_flag()
+
+
+def guess_source_language(text):
+    lang = langdetect.script_lang(text)
+    return lang if lang is not None else langdetect.latin_lang([text])[0]
+
+
+def restore_default(target, package_id, source, translate=None):
+    """Drop the manual correction of `source` and go back to the automatic translation: translated again right now with `translate`
+    (a function text -> translation) when it is given and works; otherwise the saved translation is removed, so the text is translated
+    again the next time the mod is processed. Returns the new translation or None."""
+    ov = read_overrides(target)
+    n = normalize(source)
+    kept = {k: v for k, v in ov.items() if normalize(k) != n}
+    if len(kept) != len(ov):
+        write_overrides(target, kept)
+    new = None
+    if translate is not None:
+        try:
+            new = translate(source)
+        except Exception:  # noqa: BLE001 - no model right now: it is translated later
+            log.warning("could not translate again a restored text", exc_info=True)
+    cache = read_cache(target, package_id)
+    if new:
+        cache[source] = new
+    else:
+        cache.pop(source, None)
+    write_cache(target, package_id, cache)
+    pulse_game_flag()
+    return new
+
+
 def repair_all(target):
     """Fix saved translations that an older version got wrong (glossary words like "safe" -> "cofre", a full stop on bare
     labels). The game picks the changed files up by itself. Returns the number of entries fixed."""
-    d = data_dir() / "cache" / target
+    d = cache_dir() / target
     total = 0
     if not d.is_dir():
         return 0
@@ -102,7 +224,7 @@ def clear_translations(target):
     """Delete every saved translation for `target` (the cache files the game reads) and forget what was done, so the mods
     show as new again. The player's manual corrections (overrides) are kept. Returns the number of files deleted."""
     n = 0
-    d = data_dir() / "cache" / target
+    d = cache_dir() / target
     if d.is_dir():
         for f in d.iterdir():
             if f.is_file():
@@ -509,7 +631,7 @@ def process_mod(mod, target, coverage, cancel=None, progress=None, model_ok=None
 FLAG_NAME = "bulk-running.flag"
 
 
-def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True, polite=False):
+def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True, polite=False, only=None):
     """Translate pending (new/changed) mods, or all with force=True. Returns the list of ModResult.
     polite=True is the background run: between batches it waits while the game is asking for translations (the active mods first).
     While it runs, a small flag file (<data>/bulk-running.flag) is touched every 2 seconds: the game, if it is open, only looks at the
@@ -526,12 +648,14 @@ def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending
             stop.wait(2.0)
     t = threading.Thread(target=beat, daemon=True, name="bulk-flag")
     t.start()
-    global _polite
+    global _polite, _runs_active
     _polite = polite
+    _runs_active += 1
     engine.set_cancel(cancel)
     try:
-        return _run(target, dirs, force, progress, cancel, only_pending)
+        return _run(target, dirs, force, progress, cancel, only_pending, only)
     finally:
+        _runs_active -= 1
         engine.set_cancel(None)
         _polite = False
         stop.set()
@@ -542,11 +666,11 @@ def run(target, dirs=None, force=False, progress=None, cancel=None, only_pending
             pass
 
 
-def _run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True):
+def _run(target, dirs=None, force=False, progress=None, cancel=None, only_pending=True, only=None):
     progress = progress or (lambda e: None)
     items = plan(target, dirs)
     mods = [m for m, _s, _r in items]
-    todo = [(m, s) for m, s, _r in items if force or s != "ok"]
+    todo = [(m, s) for m, s, _r in items if (only is None or m.package_id in only) and (force or s != "ok")]       # only: package ids the user ticked
     coverage = build_coverage(mods, target)
     ensured = {}
 

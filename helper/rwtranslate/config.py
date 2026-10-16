@@ -38,9 +38,10 @@ def set(key, value):  # noqa: A001 - mirrors dict API
 def migrate_portuguese():
     """Settings made before Portuguese was split into Brazil and Portugal said "pt": that meant Brazilian Portuguese.
     Rename the saved translations, the manual corrections and the bulk state to "pt-BR" (nothing is overwritten) and fix the target."""
-    from .paths import data_dir
+    from .paths import cache_dir, data_dir
     d = data_dir()
-    for sub, old, new in (("cache", "pt", "pt-BR"), ("overrides", "pt.json", "pt-BR.json")):
+    cache_dir()                                           # (moves the old "cache" folder first, if there is one)
+    for sub, old, new in (("translated mods", "pt", "pt-BR"), ("overrides", "pt.json", "pt-BR.json")):
         a, b = d / sub / old, d / sub / new
         try:
             if a.exists() and not b.exists():

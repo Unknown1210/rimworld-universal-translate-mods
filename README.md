@@ -3,9 +3,10 @@
 <p align="center">
 <a href="README.br.md"><img src="https://img.shields.io/badge/LEIA_EM-PORTUGU%C3%8AS-2ea44f?style=for-the-badge" alt="Português"></a>
 <a href="README.en.md"><img src="https://img.shields.io/badge/READ_IN-ENGLISH-2ea44f?style=for-the-badge" alt="English"></a>
+<a href="FAQ.md"><img src="https://img.shields.io/badge/FAQ-AJUDA_%2F_HELP-2ea44f?style=for-the-badge" alt="FAQ"></a>
 </p>
 
-<p align="center"><b>Versão atual / Current version: 0.029</b> · <a href="../../releases/latest">Releases</a></p>
+<p align="center"><b>Versão atual / Current version: 0.047</b> · <a href="../../releases/latest">Releases</a></p>
 
 <div align="center">
 

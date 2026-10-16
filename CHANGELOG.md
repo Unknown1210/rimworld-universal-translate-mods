@@ -4,6 +4,54 @@ Versioning: `0.NNN` (0.001, 0.002, ...) until the maintainer declares 1.0. **Eve
 (newest first). The same text goes in the commit message: `v0.NNN: short title` + list of changes.
 Version lives in `VERSION`; run `python tools/set_version.py` to sync it into the helper and the mod.
 
+## v0.047 - 2026-10-16
+Resumo de tudo o que mudou desde a v0.029 (v0.030 a v0.047).
+
+Vários idiomas
+- Adicionado: vários idiomas para traduzir. Na aba Início, a linha "Idiomas para traduzir" e, na aba Traduzir mods, o botão "Idioma para tradução dos mods (N)" abrem a mesma janela, com caixas de marcar, "Marcar todos", "Desmarcar todos" e o "Idioma usado no jogo"; a lista fica salva no config.json ("targets") e as duas telas mostram sempre a mesma lista.
+- Alterado: o jogo continua usando um só idioma: o campo antigo virou "Idioma usado no jogo" e continua gravando "target" no config.json, como antes.
+- Corrigido: "Desmarcar todos" desmarca tudo; com nada marcado a janela mostra "Nenhum idioma selecionado", o botão de traduzir avisa o mesmo e nada é traduzido até marcar um idioma.
+- Adicionado: o botão "Baixar modelos que faltam (N)" baixa um modelo depois do outro, com o percentual.
+- Adicionado: "Traduzir pendentes" e "Refazer tudo" fazem um idioma depois do outro (o do jogo primeiro), perguntam antes de começar quando há mais de um idioma (avisando quantos modelos faltam e que o tempo é multiplicado) e a pergunta conta só os mods que serão feitos; Parar mantém o que já foi feito.
+- Adicionado: a coluna Estado mostra "Traduzido em N de M idiomas", e "Traduzir pendentes" conta também os mods que faltam em algum idioma.
+- Alterado: a tradução automática em segundo plano só faz o idioma usado no jogo; a lista de idiomas fica travada enquanto uma tradução está em andamento.
+- Corrigido: na janela de idiomas, a rodinha do mouse rola a lista com o ponteiro em qualquer lugar da janela.
+
+Janela de detalhes do mod
+- Adicionado: seletor "Idioma:" com os idiomas que já têm tradução do mod; salvar ou restaurar uma correção vale só para o idioma mostrado.
+- Adicionado: a tradução pode ser corrigida à mão (Salvar grava em "overrides" e nas traduções do mod; Restaurar padrão apaga a correção e traduz de novo), com o original acinzentado, aviso "Somente a tradução pode ser editada manualmente." e quadros do original e da tradução sempre do mesmo tamanho, com uma barra para mudar a altura.
+- Adicionado: caixa de filtro com botão Limpar, botão "Quebrar linhas" (azul quando ligado, escolha salva), linhas de separação entre textos e colunas, e o quadro de baixo em duas colunas (original à esquerda, tradução à direita).
+- Corrigido: ao clicar em uma linha o quadro de baixo mostrava o texto de outra; a lista não tem mais espaço em branco antes da primeira linha; ao redimensionar, a tabela e o quadro de baixo crescem e o movimento ficou mais fluido.
+- Alterado: textos e botões alinhados e com mais espaço (margem no topo, aviso de correção ao lado de Fechar, Fechar à esquerda e Restaurar padrão e Salvar à direita).
+- Adicionado: o programa lembra o tamanho e a posição das janelas, a largura das colunas das tabelas e a altura entre a tabela e os quadros de baixo.
+
+Aba Traduzir mods e aba Início
+- Adicionado: caixas de seleção antes da coluna Mod; com mods marcados, só os marcados são traduzidos ("Traduzir selecionados" e "Refazer selecionados"); título "Traduzindo mods para IDIOMA" no quadro de progresso.
+- Alterado: a "Tradução automática em segundo plano" (antes "Traduzir também os mods desativados") fica no topo do quadro 1, começa 30 segundos depois de abrir o programa e, desligada, deixa o texto do quadro 1 acinzentado; a escolha fica salva.
+- Alterado: textos dos quadros 1 e 2, do título "2) Traduza tudo agora", da aba Traduzir mods e do aviso "(os mods ativos traduzem primeiro)" revisados; a linha do download do modelo aparece logo abaixo do idioma.
+- Corrigido: a caixa de tradução automática aparecia com um traço "-" e pedia dois cliques; a caixa Mostrar da aba Log não fica mais azul ao abrir; caixas de seleção da tabela alinhadas e centralizadas.
+- Alterado: a etiqueta de cada pasta pesquisada ("[adicionada por você]", "[padrão]", "[não encontrada]") fica alinhada à direita.
+
+Aba Ajuda e FAQ
+- Adicionado: aba "Ajuda (FAQ)" com perguntas e respostas em português e inglês, caixa de busca e texto que pode ser copiado; página FAQ.md gerada a partir da aba (tools/make_faq.py, também chamado por tools/set_version.py e conferido no CI) e botão "FAQ" no topo dos READMEs.
+
+Modelos e traduções
+- Corrigido: o botão "Baixar modelo" e o idioma da janela podiam iniciar dois downloads do mesmo modelo, que travavam; agora há um download por modelo, e um modelo já instalado nunca é baixado de novo.
+- Alterado: escolher um idioma não baixa o modelo sozinho (só o botão Baixar modelo), e o botão mostra o percentual.
+- Alterado: o idioma da janela mostra "Baixando o modelo... X%" e "Traduzindo a janela... N/Total", e os textos vão ao modelo em grupos de 30 (preparar um idioma novo ficou várias vezes mais rápido).
+- Corrigido: a palavra "Vanilla" não é mais traduzida, e as traduções antigas com "Baunilha" e formas de outros idiomas são consertadas sozinhas.
+- Alterado: as pastas de dados passaram de "models" para "translation models" e de "cache" para "translated mods" (no programa e no mod); as antigas são movidas sozinhas, sem perder nada nem baixar de novo.
+
+Mod (jogo)
+- Corrigido: uma correção feita à mão avisa o jogo aberto e é aplicada em poucos segundos, sem reiniciar; o mod lê de novo o arquivo de correções (overrides) quando ele muda, para uma segunda correção do mesmo texto valer na hora.
+- Alterado: a versão do mod acompanha a do programa; o mod novo vai no release (UniversalTranslate-Mod.zip), para atualizar na Oficina.
+
+Executável, README e testes
+- Adicionado: o .exe leva as informações de versão do Windows (empresa, descrição, versão, licença, nome do arquivo), e os dois processos de geração do .exe passam o arquivo de versão ao PyInstaller.
+- Alterado: README (português e inglês) atualizado: instalação com a Oficina da Steam ou com o zip ("Instale o mod ou inscreva-se nele na Steam Workshop, ou extraia a pasta AutoTranslate do UniversalTranslate-Mod.zip para dentro de RimWorld\Mods"), vários idiomas, pastas "translation models" e "translated mods", correção manual, filtro e quebra de linhas, tabela de compatibilidade centralizada; removidas a frase dos idiomas sem modelo, os itens "Tamanhos lembrados" e os dois itens de segurança sobre 127.0.0.1 e a senha aleatória.
+- Alterado: as tabelas do THIRD_PARTY_NOTICES ficaram centralizadas.
+- Adicionado: testes novos para tudo isso (lista de idiomas, janela de idiomas, tradução em sequência, confirmação, estado da tabela, download único, Vanilla, tamanhos salvos, detalhes por idioma, FAQ, informações de versão do .exe e releitura das correções no mod); corrigidos dois testes que dependiam da busca de mods do início.
+
 ## v0.029 - 2026-10-15
 - Corrigido: o nome da janela em francês (e de outros idiomas) aparecia com "&#160;"; sequências desse tipo agora viram o caractere real, também nos textos já salvos.
 - Alterado: tcheco, dinamarquês, húngaro e polonês não aparecem mais como idioma da janela nem como idioma de destino, porque não existe modelo de tradução do inglês para eles que o programa consiga usar.

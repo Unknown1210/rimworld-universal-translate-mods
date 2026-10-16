@@ -1,11 +1,12 @@
 """Download/install Argos translation models for any language pair.
 
-A pair model lives in <data>/models/<src>_<tgt>/ . When no direct model exists the helper pivots through English
+A pair model lives in <data>/translation models/<src>_<tgt>/ . When no direct model exists the helper pivots through English
 (src->en and en->tgt, both installed), which is how most non-English pairs are served.
 """
 import json
 import os
 import shutil
+import threading
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -163,7 +164,53 @@ def install(src, tgt, progress=print, index=None):
         _install_pair(s, t, progress, index)
 
 
+_jobs = {}                       # (src, tgt) -> the download that is running right now
+_jobs_lock = threading.Lock()
+
+
 def _install_pair(src, tgt, progress, index):
+    """One download per pair at a time. A second caller (the "Download model" button and the window language asking for the same model,
+    say) does NOT start a second download that would write the same files: it waits for the first one, hears its progress, and ends
+    when it ends (with the same error, if it failed)."""
+    key = (src, tgt)
+    with _jobs_lock:
+        job = _jobs.get(key)
+        owner = job is None
+        if owner:
+            job = _jobs[key] = {"listeners": [progress], "done": threading.Event(), "error": None, "last": None}
+        else:
+            job["listeners"].append(progress)
+    if not owner:
+        if job["last"]:
+            try:
+                progress(job["last"])
+            except Exception:  # noqa: BLE001
+                pass
+        job["done"].wait()
+        if job["error"] is not None:
+            raise job["error"]
+        return
+
+    def broadcast(msg):
+        if isinstance(msg, str) and msg.startswith("  "):
+            job["last"] = msg
+        for cb in list(job["listeners"]):
+            try:
+                cb(msg)
+            except Exception:  # noqa: BLE001 - a listener must never break the download
+                pass
+    try:
+        _install_pair_now(src, tgt, broadcast, index)
+    except BaseException as e:  # noqa: BLE001
+        job["error"] = e
+        raise
+    finally:
+        with _jobs_lock:
+            _jobs.pop(key, None)
+        job["done"].set()
+
+
+def _install_pair_now(src, tgt, progress, index):
     if is_installed(src, tgt):
         return
     cands = [p for p in index if p["from_code"] == src and p["to_code"] == tgt]

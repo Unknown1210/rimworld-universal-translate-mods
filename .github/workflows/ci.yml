@@ -6,6 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: python3 tools/set_version.py --check
+      - run: python3 tools/make_faq.py --check
   helper:
     strategy:
       fail-fast: false

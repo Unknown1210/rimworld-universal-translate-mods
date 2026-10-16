@@ -100,7 +100,7 @@ class Lang(unittest.TestCase):
     def test_old_pt_settings_become_brazilian(self):
         from rwtranslate import config
         from rwtranslate.paths import data_dir
-        old, new = data_dir() / "cache" / "pt", data_dir() / "cache" / "pt-BR"
+        old, new = data_dir() / "cache" / "pt", data_dir() / "translated mods" / "pt-BR"
         had_new = new.exists()
         old_target = config.get("target")
         try:
@@ -423,6 +423,269 @@ class FakeResult:
 class FakeSP:
     def encode(self, s, out_type=str):
         return s.split()
+
+
+class TargetLanguagesList(unittest.TestCase):
+    def setUp(self):
+        from rwtranslate import config
+        self.config = config
+        config.set("target", None)
+        config.set("targets", None)
+
+    def tearDown(self):
+        self.config.set("target", None)
+        self.config.set("targets", None)
+
+    def test_the_game_language_is_always_in_the_list_and_first(self):
+        from rwtranslate import targets
+        self.assertEqual(targets.selected(), [])
+        self.assertEqual(targets.set_selected(["ja", "pt-BR", "es"], "pt-BR"), ["pt-BR", "ja", "es"])
+        self.assertEqual(self.config.get("target"), "pt-BR", "the game still reads ONE language")
+        self.assertEqual(targets.set_selected(["ja", "es"], "es"), ["es", "ja"])
+        self.assertEqual(self.config.get("target"), "es")
+        # the game language was not ticked: the first ticked one is used
+        self.assertEqual(targets.set_selected(["fr", "de"]), ["fr", "de"])
+        self.assertEqual(self.config.get("target"), "fr")
+
+    def test_unknown_duplicate_and_unusable_languages_are_dropped(self):
+        from rwtranslate import targets
+        self.assertEqual(targets.set_selected(["ja", "ja", "xx", "cs", "da", "hu", "pl", 5, None, "zh-Hant"], "ja"), ["ja", "zh-Hant"])
+        self.assertEqual(targets.set_selected([]), [], "an empty list is allowed: nothing selected")
+        self.assertEqual(targets.selected(), [])
+        self.assertEqual(self.config.get("target"), "ja", "the game keeps its language")
+
+    def test_picking_the_game_language_alone_adds_it_to_the_list(self):
+        from rwtranslate import targets
+        targets.set_selected(["pt-BR", "ja"], "pt-BR")
+        self.assertEqual(targets.set_game_language("fr"), ["fr", "pt-BR", "ja"])
+        self.assertEqual(self.config.get("target"), "fr")
+        self.assertEqual(targets.set_game_language("ja"), ["ja", "fr", "pt-BR"])
+
+    def test_old_settings_with_only_a_target_still_work(self):
+        from rwtranslate import targets
+        self.config.set("target", "pt")                     # an old setting: "pt" meant Brazilian Portuguese
+        self.assertEqual(targets.selected(), ["pt-BR"])
+        self.assertEqual(targets.primary(), "pt-BR")
+
+
+class OneDownloadPerModel(unittest.TestCase):
+    """The "Download model" button and the window language can ask for the same model at the same moment: one download, not two."""
+
+    def test_two_callers_share_one_download_and_one_progress(self):
+        import threading
+        import time
+        from pathlib import Path
+        from unittest import mock
+        from rwtranslate import models
+        index = [{"from_code": "en", "to_code": "qq", "package_version": "1.0", "links": ["http://x/qq.argosmodel"]}]
+        downloads, seen = [], []
+
+        def fake_download(url, tmp, dest, progress):
+            downloads.append(url)
+            progress("  26% (20 MB)")
+            time.sleep(0.4)
+            Path(dest).mkdir(parents=True, exist_ok=True)
+            (Path(dest) / "model.bin").write_text("x")
+            (Path(dest) / "sentencepiece.model").write_text("x")
+            progress("  100% (80 MB)")
+        errors = []
+
+        def call(tag):
+            try:
+                models.install("en", "qq", progress=lambda m: seen.append((tag, m)), index=index)
+            except Exception as e:  # noqa: BLE001
+                errors.append(e)
+        try:
+            with mock.patch.object(models, "_download_and_unpack", fake_download):
+                t1 = threading.Thread(target=call, args=("first",))
+                t1.start()
+                time.sleep(0.1)
+                t2 = threading.Thread(target=call, args=("second",))                     # asks while the first one is still downloading
+                t2.start()
+                t1.join(10)
+                t2.join(10)
+                self.assertEqual(errors, [])
+                self.assertEqual(len(downloads), 1, "a single download")
+                self.assertTrue(models.is_installed("en", "qq"))
+                self.assertTrue(any(tag == "second" and "26%" in m for tag, m in seen), "the second caller hears the progress too")
+                models.install("en", "qq", progress=lambda m: seen.append(("third", m)), index=index)        # already there: nothing to do
+                self.assertEqual(len(downloads), 1, "an installed model is never downloaded again")
+        finally:
+            import shutil
+            shutil.rmtree(models.pair_dir("en", "qq"), ignore_errors=True)
+
+    def test_a_failed_download_fails_for_everyone_waiting(self):
+        import threading
+        import time
+        from unittest import mock
+        from rwtranslate import models
+        index = [{"from_code": "en", "to_code": "qr", "package_version": "1.0", "links": ["http://x/qr.argosmodel"]}]
+
+        def failing(url, tmp, dest, progress):
+            time.sleep(0.3)
+            raise OSError("network down")
+        errors = []
+
+        def call():
+            try:
+                models.install("en", "qr", progress=lambda m: None, index=index)
+            except Exception as e:  # noqa: BLE001
+                errors.append(type(e).__name__)
+        with mock.patch.object(models, "_download_and_unpack", failing):
+            ts = [threading.Thread(target=call) for _ in range(2)]
+            ts[0].start()
+            time.sleep(0.1)
+            ts[1].start()
+            for t in ts:
+                t.join(10)
+        self.assertEqual(errors, ["OSError", "OSError"])
+        self.assertFalse(models._jobs, "nothing is left marked as downloading")
+
+
+class WindowLanguageIsPreparedInGroups(unittest.TestCase):
+    def test_the_window_texts_go_to_the_model_in_a_few_calls_with_progress(self):
+        from rwtranslate import i18n, uitext
+        calls, steps = [], []
+
+        def fake(texts):
+            calls.append(len(texts))
+            return ["SV:" + t for t in texts]
+        set_engine("en", "sv", type("E", (), {"translate_batch": staticmethod(fake)})())
+        uitext.forget()
+        total = len(uitext.pending("sv"))
+        n = uitext.translate_missing("sv", progress=lambda d, t: steps.append((d, t)))
+        self.assertEqual(n, total)
+        self.assertLessEqual(len(calls), -(-total // uitext.CHUNK) + 2, f"{len(calls)} model calls for {total} texts (it used to be one call per text)")
+        self.assertEqual(steps[-1], (total, total))
+        self.assertTrue(all(b - a > 0 for a, b in zip([0] + [d for d, _t in steps], [d for d, _t in steps])), "progress only moves forward")
+        self.assertEqual(i18n.tr("sv", "quit_btn"), "SV:Quit")
+
+
+class GameFlagAfterAManualCorrection(unittest.TestCase):
+    def test_the_flag_the_game_watches_is_kept_alive_a_few_seconds_then_removed(self):
+        import time
+        from rwtranslate import bulk
+        flag = bulk.data_dir() / bulk.FLAG_NAME
+        flag.unlink(missing_ok=True)
+        bulk.pulse_game_flag(seconds=0.3, step=0.1)
+        time.sleep(0.15)
+        self.assertTrue(flag.exists(), "the game sees the flag while the correction is applied")
+        time.sleep(0.8)
+        self.assertFalse(flag.exists(), "and it goes away afterwards (the game then looks one last time)")
+
+    def test_saving_a_correction_pulses_the_flag(self):
+        from unittest import mock
+        from rwtranslate import bulk
+        with mock.patch.object(bulk, "pulse_game_flag") as pulse:
+            bulk.save_edit("zz", "p.mod", "Hello", "Olá")
+            pulse.assert_called_once()
+            bulk.restore_default("zz", "p.mod", "Hello", translate=lambda t: "Olá!")
+            self.assertEqual(pulse.call_count, 2)
+        for f in (bulk.cache_path("zz", "p.mod"), bulk.overrides_path("zz")):
+            f.unlink(missing_ok=True)
+
+
+class FaqPage(unittest.TestCase):
+    def test_faq_md_is_the_help_tab(self):
+        import importlib.util
+        root = os.path.join(os.path.dirname(__file__), "..", "..")
+        spec = importlib.util.spec_from_file_location("make_faq", os.path.join(root, "tools", "make_faq.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        with open(os.path.join(root, "FAQ.md"), encoding="utf-8") as f:
+            self.assertEqual(f.read(), mod.build(), "FAQ.md is out of date: run python tools/make_faq.py")
+        with open(os.path.join(root, "README.md"), encoding="utf-8") as f:
+            self.assertIn('href="FAQ.md"', f.read(), "the README has the FAQ button")
+
+
+class ExeVersionInfo(unittest.TestCase):
+    def test_version_file_for_the_exe_is_valid_and_has_the_project_version(self):
+        import importlib.util
+        root = os.path.join(os.path.dirname(__file__), "..", "..")
+        spec = importlib.util.spec_from_file_location("make_version_info", os.path.join(root, "tools", "make_version_info.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        text = mod.build("0.039")
+
+        class Rec:                              # stand-ins for the PyInstaller classes: the file is Python that builds them
+            def __init__(self, *a, **k):
+                self.a, self.k = a, k
+        names = {n: Rec for n in ("VSVersionInfo", "FixedFileInfo", "StringFileInfo", "StringTable", "StringStruct", "VarFileInfo", "VarStruct")}
+        info = eval(text, names)
+        self.assertEqual(info.k["ffi"].k["filevers"], (0, 39, 0, 0))
+        self.assertIn("'0.039.0'", text)
+        self.assertIn("UniversalTranslate-Helper.exe", text)
+
+
+class VanillaStaysVanilla(unittest.TestCase):
+    """The base game is called "Vanilla": never "Baunilha" / "vainilla"."""
+
+    def test_the_word_is_protected_from_the_translator(self):
+        from rwtranslate.protect import translate_protected
+        seen = []
+
+        def engine(batch):
+            seen.extend(batch)
+            return [b.replace("Furniture", "Móveis").replace("furniture", "móveis").replace("Expanded", "Expandido") for b in batch]
+        self.assertEqual(translate_protected("Vanilla", engine), "Vanilla")                                    # nothing to translate
+        self.assertEqual(translate_protected("Vanilla Furniture Expanded", engine), "Vanilla Móveis Expandido")
+        self.assertEqual(translate_protected("Better than vanilla furniture", engine), "Better than vanilla móveis")
+
+    def test_a_translation_that_still_says_baunilha_is_fixed(self):
+        from rwtranslate.protect import clean_output
+        self.assertEqual(clean_output("Vanilla Furniture Expanded", "Baunilha Móveis Expandido", "pt-BR"), "Vanilla Móveis Expandido")
+        self.assertEqual(clean_output("a vanilla bed", "uma cama de baunilha", "pt-BR"), "uma cama de vanilla")
+        self.assertEqual(clean_output("Vanilla Expanded", "Vainilla Ampliado", "es"), "Vanilla Ampliado")
+        self.assertEqual(clean_output("Vanilla Expanded", "Vanille Étendu", "fr"), "Vanilla Étendu")
+        # the real flavour in a source that does not say "vanilla" is not touched; nor another word that contains it
+        self.assertEqual(clean_output("Ice cream", "Sorvete de baunilha", "pt-BR"), "Sorvete de baunilha")
+
+    def test_saved_translations_of_older_versions_are_repaired(self):
+        from rwtranslate import glossary
+        entries = {"Vanilla Expanded": "Baunilha Expandida", "Steel": "Aço"}
+        self.assertEqual(glossary.repair_entries(entries, "pt-BR"), 1)
+        self.assertEqual(entries, {"Vanilla Expanded": "Vanilla Expandida", "Steel": "Aço"})
+
+
+class ModelsFolder(unittest.TestCase):
+    def test_old_models_folder_is_moved_not_downloaded_again(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from rwtranslate import paths
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            (base / "models" / "en_pt").mkdir(parents=True)
+            (base / "models" / "en_pt" / "ok").write_text("1")
+            with mock.patch.object(paths, "data_dir", return_value=base):
+                new = paths.models_dir()
+            self.assertEqual(new.name, "translation models")
+            self.assertTrue((new / "en_pt" / "ok").exists())
+            self.assertFalse((base / "models").exists())
+
+
+class CacheFolder(unittest.TestCase):
+    def test_old_cache_folder_becomes_translated_mods(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from rwtranslate import paths
+        with tempfile.TemporaryDirectory() as d:
+            base = Path(d)
+            (base / "cache" / "pt-BR").mkdir(parents=True)
+            (base / "cache" / "pt-BR" / "a.mod.json").write_text("old")
+            with mock.patch.object(paths, "data_dir", return_value=base):
+                new = paths.cache_dir()
+                self.assertEqual(new.name, "translated mods")
+                self.assertEqual((new / "pt-BR" / "a.mod.json").read_text(), "old")
+                self.assertFalse((base / "cache").exists())
+                # both folders (an older mod wrote into "cache" again): the files are moved in, nothing is overwritten
+                (base / "cache" / "pt-BR").mkdir(parents=True)
+                (base / "cache" / "pt-BR" / "a.mod.json").write_text("stale")
+                (base / "cache" / "pt-BR" / "b.mod.json").write_text("new file")
+                paths.cache_dir()
+                self.assertEqual((new / "pt-BR" / "a.mod.json").read_text(), "old")
+                self.assertEqual((new / "pt-BR" / "b.mod.json").read_text(), "new file")
 
 
 class ProgressLine(unittest.TestCase):

@@ -5,6 +5,7 @@ Markers that must survive translation unchanged:
   <color=#ff0000>...</color>, <b>, <i>, <size=..>  - rich text tags
   \\n and real newlines              - line breaks
   (*Name) (/Name)                   - RimWorld "(*Color)" colour tags
+  Vanilla / vanilla                 - the name of the base game: it is never translated ("Baunilha", "Vainilla"...)
 """
 import re
 
@@ -12,6 +13,7 @@ MARKER_RE = re.compile(
     r"\{[^{}]*\}"            # {0}, {PAWN_nameDef}
     r"|</?[A-Za-z][^<>]*>"   # <color=#fff>, </color>, <b>
     r"|\(\*[^()\s]*\)|\(/[^()\s]*\)"  # (*Name) (/Name)
+    r"|(?<![A-Za-z])[Vv]anilla(?![A-Za-z])"        # the word "Vanilla" stays as it is
     r"|\\n"                  # literal backslash-n
     r"|\r?\n"                # real newline
 )
@@ -94,11 +96,38 @@ def _keep_space(original, translated):
     return lead + translated + trail
 
 
+_VANILLA_SRC = re.compile(r"(?<![A-Za-z])[Vv]anilla(?![A-Za-z])")
+# how each language says "vanilla" (the flavour): what a translator puts where the game means the base game
+_VANILLA_FORMS = {
+    "pt": r"baunilha", "es": r"vainilla", "ca": r"vainilla", "fr": r"vanille", "it": r"vaniglia", "de": r"vanille", "nl": r"vanille",
+    "pl": r"wanili\w*", "ro": r"vanili\w*", "cs": r"vanilk\w*", "sk": r"vanilk\w*", "sv": r"vanilj\w*", "da": r"vanilje\w*",
+    "nb": r"vanilje\w*", "fi": r"vanilij\w*", "et": r"vanill\w*", "hu": r"vanília\w*", "tr": r"vanilya\w*", "el": r"βανίλι\w*",
+    "ru": r"ванил\w*", "uk": r"ванiл\w*|ваніл\w*", "ja": r"バニラ", "ko": r"바닐라", "zh": r"香草", "zt": r"香草",
+}
+
+
+def keep_vanilla(source, translated, target):
+    """"Vanilla" is the name of the base game, not the flavour: if the source says it and the translation turned it into the local word
+    ("Baunilha", "vainilla"...), put "Vanilla" / "vanilla" back, in the case the translation used."""
+    if not _VANILLA_SRC.search(source):
+        return translated
+    from . import languages
+    forms = _VANILLA_FORMS.get(languages.family(target))
+    if not forms:
+        return translated
+    word = re.compile(forms, re.IGNORECASE)
+
+    def back(m):
+        w = m.group(0)
+        return "Vanilla" if w[:1].isupper() else "vanilla"
+    return word.sub(back, translated)
+
+
 def clean_output(source, translated, target):
     """Last line of defence applied to every translation before it leaves the helper:
     no SentencePiece markers ("_" in game), no stray edge spaces, and the first letter keeps the SOURCE's case
     (RimWorld labels are lowercase in the XML and the game capitalises them itself; descriptions start uppercase)."""
-    t = translated.replace("\u2581", " ")
+    t = keep_vanilla(source, translated.replace("\u2581", " "), target)
     lead = t[: len(t) - len(t.lstrip())] if source[:1].isspace() else ""
     t = t.strip()
     s = source.lstrip()

@@ -16,8 +16,47 @@ def data_dir() -> Path:
     return base
 
 
+MODELS_FOLDER = "translation models"
+OLD_MODELS_FOLDER = "models"
+
+
 def models_dir() -> Path:
-    p = data_dir() / "models"
+    """<data>/translation models. The folder was called "models" before: it is moved (not downloaded again) the first time."""
+    base = data_dir()
+    p = base / MODELS_FOLDER
+    old = base / OLD_MODELS_FOLDER
+    if not p.exists() and old.is_dir():
+        try:
+            old.rename(p)
+        except OSError:
+            return old                                   # could not move it (in use?): keep using the old folder
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+CACHE_FOLDER = "translated mods"
+OLD_CACHE_FOLDER = "cache"
+
+
+def cache_dir() -> Path:
+    """<data>/translated mods: the saved translations, one folder per language, one file per mod (the game mod reads the same folder).
+    It was called "cache" before: the old folder is moved (or, if both exist, its files are moved in without overwriting anything)."""
+    base = data_dir()
+    p = base / CACHE_FOLDER
+    old = base / OLD_CACHE_FOLDER
+    if old.is_dir():
+        try:
+            if not p.exists():
+                old.rename(p)
+            else:
+                for src in list(old.rglob("*")):
+                    if src.is_file():
+                        dst = p / src.relative_to(old)
+                        if not dst.exists():
+                            dst.parent.mkdir(parents=True, exist_ok=True)
+                            src.replace(dst)
+        except OSError:
+            pass
     p.mkdir(parents=True, exist_ok=True)
     return p
 

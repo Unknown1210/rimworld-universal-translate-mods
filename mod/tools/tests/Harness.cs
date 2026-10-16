@@ -74,6 +74,14 @@ public static class Harness
         Directory.CreateDirectory(Paths.OverridesDir);
         File.WriteAllText(Path.Combine(Paths.OverridesDir, "zz.json"), "{\"entries\":{\"Hello\":\"MANUAL\"}}");
         Check(new TranslationCache("zz").TryGet("m.one", "Hello", out tr) && tr == "MANUAL", "manual override beats cache");
+        // a correction made by the player while the game runs (the helper rewrites the overrides file): the next check notices it
+        var live = new TranslationCache("zz");
+        Check(live.TryGet("m.one", "Hello", out tr) && tr == "MANUAL", "override loaded");
+        System.Threading.Thread.Sleep(30);
+        File.WriteAllText(Path.Combine(Paths.OverridesDir, "zz.json"), "{\"entries\":{\"Hello\":\"MANUAL 2\"}}");
+        File.SetLastWriteTimeUtc(Path.Combine(Paths.OverridesDir, "zz.json"), DateTime.UtcNow.AddSeconds(5));
+        live.ExternalChanges();
+        Check(live.TryGet("m.one", "Hello", out tr) && tr == "MANUAL 2", "a changed overrides file is read again while the game runs: " + tr);
 
         // ---- HelperClient against the real Python helper
         var h = HelperClient.Health();

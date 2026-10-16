@@ -7,6 +7,7 @@ the 3-part form 0.NNN.0 is used where the toolchain requires it (pip, .NET).
 """
 import pathlib
 import re
+import subprocess
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -51,6 +52,10 @@ def main(argv):
                 bad += 1
         else:
             path.write_text(re.sub(pat, lambda _m: new, text))
+    faq = ROOT / "tools" / "make_faq.py"
+    if faq.exists():                       # FAQ.md always follows the Help tab (i18n.py): regenerated here, verified with --check
+        r = subprocess.run([sys.executable, str(faq)] + (["--check"] if check else []))
+        bad += 1 if r.returncode else 0
     cl = (ROOT / "CHANGELOG.md").read_text()
     if f"## v{v} " not in cl and f"## v{v}\n" not in cl:
         print(f"MISSING CHANGELOG entry for v{v}")

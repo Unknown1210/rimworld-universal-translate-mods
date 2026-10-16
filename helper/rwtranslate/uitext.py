@@ -76,35 +76,46 @@ def _same_placeholders(a, b):
     return sorted(_PLACEHOLDER.findall(a)) == sorted(_PLACEHOLDER.findall(b))
 
 
+CHUNK = 30            # texts sent to the model together (one call each): fast, and the progress and the saved file move forward in steps
+
+
 def translate_missing(lang, progress=None):
-    """Translate every missing text (needs the en->lang model). Returns how many were translated. Saves as it goes."""
-    from .engine import get_engine
-    from .protect import clean_output, translate_protected
+    """Translate every missing text (needs the en->lang model). Returns how many were translated. Saves as it goes.
+    The texts go to the model in groups (not one by one: that was many times slower); progress(done, total) is called after each group."""
+    from .server import translate_texts
     en = _en()
     todo = pending(lang)
     if not todo:
         return 0
-    engine = get_engine("en", lang)
     stored = _read(lang)
-    n = 0
-    for i, k in enumerate(todo):
+    n = done = 0
+    for start in range(0, len(todo), CHUNK):
+        keys = todo[start:start + CHUNK]
         try:
-            t = _clean(clean_output(en[k], translate_protected(en[k], engine.translate_batch), lang))
-        except Exception:  # noqa: BLE001
-            log.exception("could not translate window text %s into %s", k, lang)
-            continue
-        if not t or not _same_placeholders(en[k], t):
-            log.warning("window text %s into %s dropped (empty or lost a placeholder)", k, lang)
-            continue
-        stored[k] = [_h(en[k]), t]
-        with _lock:
-            _memo.setdefault(lang, {})[k] = t
-        n += 1
-        if progress and (i % 20 == 0 or i == len(todo) - 1):
-            progress(i + 1, len(todo))
-        if n % 25 == 0:
-            _save(lang, stored)
-    _save(lang, stored)
+            outs = translate_texts("en", lang, [en[k] for k in keys])
+        except Exception:  # noqa: BLE001 - one bad text must not lose the whole group: try them one by one
+            log.exception("could not translate a group of window texts into %s; trying one by one", lang)
+            outs = []
+            for k in keys:
+                try:
+                    outs.append(translate_texts("en", lang, [en[k]])[0])
+                except Exception:  # noqa: BLE001
+                    log.exception("could not translate window text %s into %s", k, lang)
+                    outs.append("")
+        for k, t in zip(keys, outs):
+            t = _clean(t or "")
+            if not t or not _same_placeholders(en[k], t):
+                if t:
+                    log.warning("window text %s into %s dropped (lost a placeholder)", k, lang)
+                continue
+            stored[k] = [_h(en[k]), t]
+            with _lock:
+                _memo.setdefault(lang, {})[k] = t
+            n += 1
+        done += len(keys)
+        _save(lang, stored)
+        if progress:
+            progress(done, len(todo))
     return n
 
 

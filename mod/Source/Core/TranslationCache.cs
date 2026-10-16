@@ -47,6 +47,7 @@ namespace AutoTranslate
             {
                 try
                 {
+                    if (overrides != null && StampOf(OverridesFile) != overridesStamp) overrides = null;      // read again on the next lookup
                     if (!Directory.Exists(Dir)) return names;
                     foreach (string f in Directory.GetFiles(Dir, "*.json"))
                     {
@@ -135,9 +136,19 @@ namespace AutoTranslate
             }
         }
 
+        long overridesStamp;      // last write time of the overrides file when it was read: a correction made by the player while the game runs is noticed
+
+        string OverridesFile { get { return Path.Combine(Paths.OverridesDir, target + ".json"); } }
+
+        static long StampOf(string f)
+        {
+            try { return File.Exists(f) ? File.GetLastWriteTimeUtc(f).Ticks : 0; } catch { return 0; }
+        }
+
         void LoadOverrides()
         {
-            overrides = NormKeys(ReadEntries(Path.Combine(Paths.OverridesDir, target + ".json"), "cache-overrides"));
+            overridesStamp = StampOf(OverridesFile);
+            overrides = NormKeys(ReadEntries(OverridesFile, "cache-overrides"));
             if (overrides.Count > 0) AtLog.Info("cache", overrides.Count + " manual override(s) loaded for '" + target + "'");
         }
 
